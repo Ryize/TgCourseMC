@@ -38,7 +38,6 @@ def login(message):
     bot.register_next_step_handler(message, password)
 
 
-
 def password(message):
     bot.send_message(message.chat.id, "Введите пароль")
     bot.register_next_step_handler(message, check_autorization)
@@ -49,14 +48,22 @@ def check_autorization(message):
     temp_data[message.chat.id]["password"] = message.text
     flag = False
     for i in get_data():
-        print(i['name'], i['password'], temp_data[message.chat.id]["password"], temp_data[message.chat.id]["login"])
+        print(
+            i["name"],
+            i["password"],
+            temp_data[message.chat.id]["password"],
+            temp_data[message.chat.id]["login"],
+        )
         if (
-            i['name'] == temp_data[message.chat.id]["login"]
-            and i['password'] == temp_data[message.chat.id]["password"]
+            i["name"] == temp_data[message.chat.id]["login"]
+            and i["password"] == temp_data[message.chat.id]["password"]
         ):
             flag = True
     if flag:
-        bot.send_message(message.chat.id, f'Привет, {temp_data[message.chat.id]["login"]}')
+        bot.send_message(
+            message.chat.id, f'Привет, {temp_data[message.chat.id]["login"]}'
+        )
     else:
-        bot.send_message(message.chat.id, "неправильно введены данные",reply_markup=kb.main_kb())
-
+        bot.send_message(
+            message.chat.id, "неправильно введены данные", reply_markup=kb.main_kb()
+        )

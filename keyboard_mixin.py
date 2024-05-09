@@ -11,3 +11,12 @@ class KeyboardMixin:
         btn1 = types.KeyboardButton("Авторизация🔑")
         kb.row(btn1)
         return kb
+
+    def user_kb(self):
+        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn1 = types.KeyboardButton("Оплата 💰")
+        btn2 = types.KeyboardButton("Пропустить занятие 💤")
+        btn3 = types.KeyboardButton("Пинг ⚾")
+        kb.row(btn1, btn3)
+        kb.row(btn2)
+        return kb

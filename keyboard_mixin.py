@@ -20,10 +20,3 @@ class KeyboardMixin:
         kb.row(btn1, btn3)
         kb.row(btn2)
         return kb
-
-    def skip_lesson_kb(self):
-        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton('Да')
-        btn2 = types.KeyboardButton('Нет')
-        kb.row(btn1, btn2)
-        return kb

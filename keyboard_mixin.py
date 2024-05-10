@@ -6,13 +6,22 @@ from telebot import types
 
 
 class KeyboardMixin:
+    """
+    Клас содержит основные клавиатуры, используемые в боте
+    """
     def main_kb(self):
+        """
+        Клавиатура авторизации
+        """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
         btn1 = types.KeyboardButton("Авторизация🔑")
         kb.row(btn1)
         return kb
 
     def user_kb(self):
+        """
+        Клавиатура действий, доступных для пользователя
+        """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
         btn1 = types.KeyboardButton("Оплата 💰")
         btn2 = types.KeyboardButton("Пропустить занятие 💤")
@@ -22,6 +31,9 @@ class KeyboardMixin:
         return kb
 
     def skip_lesson_kb(self):
+        """
+        Клавиатура подтверждения пропуска занятия
+        """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
         btn1 = types.KeyboardButton("Да")
         btn2 = types.KeyboardButton("Нет")

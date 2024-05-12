@@ -76,8 +76,8 @@ def check_autorization(message):
             temp_data[message.chat.id]["login"],
         )
         if (
-            i["name"] == temp_data[message.chat.id]["login"]
-            and i["password"] == temp_data[message.chat.id]["password"]
+                i["name"] == temp_data[message.chat.id]["login"]
+                and i["password"] == temp_data[message.chat.id]["password"]
         ):
             flag = True
     if flag:
@@ -88,3 +88,16 @@ def check_autorization(message):
         bot.send_message(
             message.chat.id, "неправильно введены данные", reply_markup=kb.main_kb()
         )
+
+
+@bot.message_handler(func=lambda message: message.text == "Пинг ⚾")
+def button_ping(message):
+    """
+    Действия бота при нажатии кнопки "Пинг ⚾"
+
+    Эта кнопка нужна для того, чтобы проверить, что бот работает.
+    Если он работает, он пишет пользователю "Понг" на его нажатие кнопки "Пинг".
+    """
+    bot.send_message(
+        message.chat.id, "Понг ⚾"
+    )

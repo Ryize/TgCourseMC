@@ -34,7 +34,6 @@ def welcome(message):
         reply_markup=kb.main_kb(),
     )
     bot.register_next_step_handler(message, login)
-    temp_data[message.chat.id] = {}
 
 
 @bot.message_handler(func=lambda message: message.text == "Авторизация🔑")
@@ -43,6 +42,7 @@ def login(message):
     Функция принимает сообщение с main_kb, запрашивает сообщением
     логин пользователя, ожидает ввода данных пользователем
     """
+    temp_data[message.chat.id] = {}
     bot.send_message(
         message.chat.id, "Введите логин, указанный при регистрации на сайте."
     )
@@ -70,12 +70,6 @@ def check_autorization(message):
     temp_data[message.chat.id]["password"] = message.text
     flag = False
     for i in get_data():
-        print(
-            i["name"],
-            i["password"],
-            temp_data[message.chat.id]["password"],
-            temp_data[message.chat.id]["login"],
-        )
         if (
                 i["name"] == temp_data[message.chat.id]["login"]
                 and i["password"] == temp_data[message.chat.id]["password"]
@@ -83,13 +77,15 @@ def check_autorization(message):
             flag = True
     if flag:
         bot.send_message(
-            message.chat.id, f'Привет, {temp_data[message.chat.id]["login"]}'
+            message.chat.id,
+            f'Привет, {temp_data[message.chat.id]["login"]}!',
+            reply_markup=kb.user_kb()
         )
     else:
         bot.send_message(
-            message.chat.id, "неправильно введены данные", reply_markup=kb.main_kb()
+            message.chat.id, "Неправильно введены данные!",
         )
-
+        login(message)
 
 @bot.message_handler(func=lambda message: message.text == "Пинг ⚾")
 def button_ping(message):

@@ -8,6 +8,7 @@ import telebot
 
 from api_worker import get_data
 from keyboard_mixin import KeyboardMixin
+from models import *
 
 TOKEN = os.getenv("TOKEN")
 bot = telebot.TeleBot(TOKEN)

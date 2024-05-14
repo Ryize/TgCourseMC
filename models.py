@@ -15,7 +15,6 @@ class BaseModel(Model):
 class User(BaseModel):
     chat_id = IntegerField(unique=True)
     name = CharField()
-    is_auth = BooleanField()
 
     class Meta:
         db_table = 'users'

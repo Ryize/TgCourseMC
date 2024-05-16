@@ -6,6 +6,7 @@ import os
 
 import telebot
 
+import billing
 from api_worker import get_data
 from keyboard_mixin import KeyboardMixin
 from models import *
@@ -86,6 +87,7 @@ def check_autorization(message):
             message.chat.id, "Неправильно введены данные!",
         )
         login(message)
+
 
 @bot.message_handler(func=lambda message: message.text == "Пинг ⚾")
 def button_ping(message):

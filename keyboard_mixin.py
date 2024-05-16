@@ -9,7 +9,8 @@ class KeyboardMixin:
     """
     Клас содержит основные клавиатуры, используемые в боте
     """
-    def main_kb(self):
+    @staticmethod
+    def main_kb():
         """
         Клавиатура авторизации
         """
@@ -18,7 +19,8 @@ class KeyboardMixin:
         kb.row(btn1)
         return kb
 
-    def user_kb(self):
+    @staticmethod
+    def user_kb():
         """
         Клавиатура действий, доступных для пользователя
         """
@@ -30,7 +32,8 @@ class KeyboardMixin:
         kb.row(btn2)
         return kb
 
-    def skip_lesson_kb(self):
+    @staticmethod
+    def skip_lesson_kb():
         """
         Клавиатура подтверждения пропуска занятия
         """

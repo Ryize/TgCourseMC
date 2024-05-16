@@ -59,7 +59,7 @@ def password(message):
     """
     Функция принимает логин пользователя в виде сообщения,
     сохраняет его в словаре и запрашивает пароль.
-    Ожидает ввода пароля
+    Ожидает ввода пароля.
     """
     bot.send_message(message.chat.id, "Введите пароль")
     bot.register_next_step_handler(message, check_autorization)

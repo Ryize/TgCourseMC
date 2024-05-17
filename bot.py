@@ -22,13 +22,16 @@ temp_data = {}
 def welcome(message):
     """
     Функция приветствия, принимает команду "start",
-    выдает приветственное сообщение и сравнивает tg id пользователя с tg id в таблице users.db.
-    Если tg id пользователя есть в базе, то пользователю выдаётся клавиатура users_kb, иначе выдаёт кнопку "Авторизация".
+    выдает приветственное сообщение и сравнивает tg id пользователя с tg id в
+    таблице users.db.
+    Если tg id пользователя есть в базе, то пользователю выдаётся клавиатура
+    users_kb, иначе выдаёт кнопку "Авторизация".
     """
-    user = User.select().where(User.chat_id == message.chat.id).get()
+    user = User.select().where(User.chat_id == message.chat.id).first()
     if user:
         bot.send_message(
-            message.chat.id, "Здравствуй частый пользователь этого бота!",
+            message.chat.id,
+            f'Здравствуй, {user.name}',
             reply_markup=kb.user_kb(),
         )
     else:
@@ -77,22 +80,19 @@ def check_autorization(message):
     flag = False
     for i in get_data():
         if (
-                i["name"] == temp_data[message.chat.id]["login"]
-                and i["password"] == temp_data[message.chat.id]["password"]
+            i["name"] == temp_data[message.chat.id]["login"]
+            and i["password"] == temp_data[message.chat.id]["password"]
         ):
             flag = True
     if flag:
-        bot.send_message(
-            message.chat.id,
-            f'Привет, {temp_data[message.chat.id]["login"]}!',
-            reply_markup=kb.user_kb()
-        )
         user = User(chat_id=message.chat.id, name=temp_data[message.chat.id]["login"])
 
         user.save()
+        welcome(message)
     else:
         bot.send_message(
-            message.chat.id, "Неправильно введены данные!",
+            message.chat.id,
+            "Неправильно введены данные!",
         )
         login(message)
 
@@ -105,6 +105,4 @@ def button_ping(message):
     Эта кнопка нужна для того, чтобы проверить, что бот работает.
     Если он работает, он пишет пользователю "Понг" на его нажатие кнопки "Пинг".
     """
-    bot.send_message(
-        message.chat.id, "Понг ⚾"
-    )
+    bot.send_message(message.chat.id, "Понг ⚾")

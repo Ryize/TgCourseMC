@@ -9,6 +9,7 @@ class KeyboardMixin:
     """
     Клас содержит основные клавиатуры, используемые в боте
     """
+
     @staticmethod
     def main_kb():
         """
@@ -41,4 +42,17 @@ class KeyboardMixin:
         btn1 = types.KeyboardButton("Да")
         btn2 = types.KeyboardButton("Нет")
         kb.row(btn1, btn2)
+        return kb
+
+    @staticmethod
+    def admin_kb():
+        """
+        Клавиатура администратора
+        """
+        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn1 = types.KeyboardButton("Заявки 📝")
+        btn2 = types.KeyboardButton("Отправить сообщение всем 📣")
+        btn3 = types.KeyboardButton("Пинг ⚾")
+        kb.row(btn1, btn3)
+        kb.row(btn2)
         return kb

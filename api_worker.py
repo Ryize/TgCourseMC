@@ -1,14 +1,14 @@
 """
 Модуль отвечает за работу с api зарегестрированых пользователей сайта
 """
+
 import json
 import os
-
 
 import requests
 
 STUDENT_API = os.getenv("STUDENT_API")
-PAYMENT_API = os.getenv("PAYMENT_API") + 'MatveyChekashov/'
+PAYMENT_API = os.getenv("PAYMENT_API") + "MatveyChekashov/"
 
 
 def get_data():
@@ -18,6 +18,7 @@ def get_data():
     data_no_json = requests.get(STUDENT_API, timeout=5).text
     data = json.loads(data_no_json)
     return data
+
 
 def get_payment():
     """

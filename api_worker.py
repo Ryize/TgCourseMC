@@ -8,7 +8,7 @@ import os
 import requests
 
 STUDENT_API = os.getenv("STUDENT_API")
-PAYMENT_API = os.getenv("PAYMENT_API") + "MatveyChekashov/"
+# PAYMENT_API = os.getenv("PAYMENT_API") + 'MatveyChekashov/'
 
 
 def get_data():

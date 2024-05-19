@@ -2,17 +2,13 @@
 Модуль с логикой работы бота
 """
 
-import os
-
-import telebot
-
 import billing
+from admin import admin_actions
 from api_worker import get_data
+from config import bot
 from keyboard_mixin import KeyboardMixin
 from models import *
 
-TOKEN = os.getenv("TOKEN")
-bot = telebot.TeleBot(TOKEN)
 kb = KeyboardMixin()
 
 temp_data = {}
@@ -22,16 +18,18 @@ temp_data = {}
 def welcome(message):
     """
     Функция приветствия, принимает команду "start",
-    выдает приветственное сообщение и сравнивает tg id пользователя с tg id в
-    таблице users.db.
-    Если tg id пользователя есть в базе, то пользователю выдаётся клавиатура
-    users_kb, иначе выдаёт кнопку "Авторизация".
+    выдает приветственное сообщение и сравнивает tg id пользователя с tg id в таблице users.db.
+    Если tg id пользователя есть в базе, то пользователю выдаётся клавиатура users_kb, иначе выдаёт кнопку "Авторизация".
+    Если в бота зашёл админ, то она сравнивает его tg id c id админа в базе и если
+    id совпало, бот выдаёт приветствие админу и его индивидуальную клавиатуру.
     """
     user = User.select().where(User.chat_id == message.chat.id).first()
-    if user:
+    if user.chat_id == 814401631:
+        admin_actions(message, user)
+    elif user:
         bot.send_message(
             message.chat.id,
-            f'Здравствуй, {user.name}',
+            f"Здравствуй, {user.name}",
             reply_markup=kb.user_kb(),
         )
     else:
@@ -85,10 +83,14 @@ def check_autorization(message):
         ):
             flag = True
     if flag:
+        bot.send_message(
+            message.chat.id,
+            f'Привет, {temp_data[message.chat.id]["login"]}!',
+            reply_markup=kb.user_kb(),
+        )
         user = User(chat_id=message.chat.id, name=temp_data[message.chat.id]["login"])
 
         user.save()
-        welcome(message)
     else:
         bot.send_message(
             message.chat.id,

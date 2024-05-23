@@ -22,4 +22,9 @@ class User(BaseModel):
         db_table = "users"
 
 
-db.create_tables([User])
+class Application(BaseModel):
+    id_application = IntegerField(unique=True)
+    class Meta:
+        db_table = "applications"
+
+db.create_tables([User, Application])

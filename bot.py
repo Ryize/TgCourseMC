@@ -78,8 +78,8 @@ def check_autorization(message):
     flag = False
     for i in get_data():
         if (
-            i["name"] == temp_data[message.chat.id]["login"]
-            and i["password"] == temp_data[message.chat.id]["password"]
+                i["name"] == temp_data[message.chat.id]["login"]
+                and i["password"] == temp_data[message.chat.id]["password"]
         ):
             flag = True
     if flag:
@@ -108,3 +108,20 @@ def button_ping(message):
     Если он работает, он пишет пользователю "Понг" на его нажатие кнопки "Пинг".
     """
     bot.send_message(message.chat.id, "Понг ⚾")
+
+
+@bot.message_handler(func=lambda message: message.text == "Пропустить занятие 💤")
+def skip_lesson_buttons(message):
+    bot.send_message(
+        message.chat.id,
+        "Сколько занятий хотите пропустить?",
+        reply_markup=kb.skip_lesson_kb(),
+    )
+
+    @bot.message_handler(func=lambda message: kb.skip_lesson_kb())
+    def confirmation_skip_lesson(message):
+        bot.send_message(
+            message.chat.id,
+            "Точно хотите пропустить занятие(я)?",
+            reply_markup=kb.skip_lesson_kb2(),
+        )

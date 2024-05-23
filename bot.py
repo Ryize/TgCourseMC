@@ -4,7 +4,7 @@
 
 import billing
 from admin import admin_actions
-from api_worker import get_data
+from api_worker import get_data, get_payment
 from config import bot
 from keyboard_mixin import KeyboardMixin
 from models import *
@@ -78,8 +78,8 @@ def check_autorization(message):
     flag = False
     for i in get_data():
         if (
-                i["name"] == temp_data[message.chat.id]["login"]
-                and i["password"] == temp_data[message.chat.id]["password"]
+            i["name"] == temp_data[message.chat.id]["login"]
+            and i["password"] == temp_data[message.chat.id]["password"]
         ):
             flag = True
     if flag:
@@ -91,6 +91,7 @@ def check_autorization(message):
         user = User(chat_id=message.chat.id, name=temp_data[message.chat.id]["login"])
 
         user.save()
+        temp_data[message.chat.id] = {}
     else:
         bot.send_message(
             message.chat.id,
@@ -112,6 +113,11 @@ def button_ping(message):
 
 @bot.message_handler(func=lambda message: message.text == "Пропустить занятие 💤")
 def skip_lesson_buttons(message):
+    """
+    Функция принимает с клавиатуры user_kb сообщение о пропуске занятия(й) и
+    выдаёт клавиатуру выбора количества занятий, которые пользователь желает
+    пропустить.
+    """
     bot.send_message(
         message.chat.id,
         "Сколько занятий хотите пропустить?",
@@ -120,8 +126,16 @@ def skip_lesson_buttons(message):
 
     @bot.message_handler(func=lambda message: kb.skip_lesson_kb())
     def confirmation_skip_lesson(message):
+        """
+        Принимает данные с клавиатуры skip_lesson_kb и
+        запрашивает подтверждение паользователя о пропуске занятия(й).
+        """
         bot.send_message(
             message.chat.id,
             "Точно хотите пропустить занятие(я)?",
             reply_markup=kb.skip_lesson_kb2(),
         )
+@bot.message_handler(func=lambda message: message.text == "Оплата 💰")
+def pay(message):
+    user = User.select().where(User.chat_id == message.chat.id).first()
+    amount = get_payment(user.name)

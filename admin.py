@@ -15,5 +15,6 @@ def admin_actions(message, user):
     """
 
     bot.send_message(
-        message.chat.id, f"Здравствуй, " f"{user.name}!", reply_markup=kb.admin_kb()
+        message.chat.id, f"Здравствуй, " f"{user.name}!",
+        reply_markup=kb.admin_kb()
     )

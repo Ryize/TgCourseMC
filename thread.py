@@ -1,16 +1,16 @@
+import os
 import threading
 import time
-import os
+
 import requests
 
 from api_worker import get_application
 from billing import check_payment
-from bot import bot, pay_data, TG_ID_ADMIN
+from bot import TG_ID_ADMIN, bot, pay_data
 from models import *
 
 TOKEN = os.getenv("TOKEN")
 PAYMENT_API = os.getenv("PAYMENT_API")
-
 
 
 def get_training():
@@ -46,7 +46,9 @@ def get_pay():
     while True:
         time.sleep(15)
         for i in pay_data:
-            if pay_data.get(i) and check_payment(pay_data[i]["payment_id"], pay_data[i]["amount"]):
+            if pay_data.get(i) and check_payment(
+                pay_data[i]["payment_id"], pay_data[i]["amount"]
+            ):
                 bot.send_message(i, "Ваш платеж успешно прошел!")
                 bot.send_message(
                     TG_ID_ADMIN,

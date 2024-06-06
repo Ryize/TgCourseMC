@@ -4,6 +4,7 @@
 
 import datetime
 import os
+import telebot
 
 import requests
 
@@ -53,18 +54,20 @@ def welcome(message):
             "при регистрации на сайте курса!",
             reply_markup=kb.main_kb(),
         )
-        bot.register_next_step_handler(message, login)
+        # bot.register_next_step_handler(message, login)
 
 
+@bot.message_handler(func=lambda message: message.text == "Авторизация🔑")
 def login(message):
     """
     Функция принимает сообщение с main_kb, запрашивает сообщением
     логин пользователя, ожидает ввода данных пользователем
     """
     temp_data[message.chat.id] = {}
+    keyboard = telebot.types.ReplyKeyboardRemove()
     bot.send_message(
-        message.chat.id, "Введите логин, указанный при регистрации на сайте."
-    )
+        message.chat.id, "Введите логин, указанный при регистрации на сайте.",
+    reply_markup=keyboard)
     bot.register_next_step_handler(message, password)
 
 
@@ -216,6 +219,9 @@ def skip_lesson_buttons(message):
 def pay(message):
     user = User.select().where(User.chat_id == message.chat.id).first()
     amount = get_payment(user.name)["amount"]
+    if amount <= 0:
+        bot.send_message(message.chat.id, 'Вы уже оплатили занятия!')
+        return
     payment = get_payment_url(amount)
     bot.send_message(
         message.chat.id, f"Оплатите {amount} рублей, по ссылке: {payment[0]}"

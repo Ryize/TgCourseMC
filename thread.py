@@ -46,16 +46,16 @@ def get_pay():
     while True:
         time.sleep(15)
         for i in pay_data:
-            if check_payment(pay_data[i]["payment_id"], pay_data[i]["amount"]):
+            if pay_data.get(i) and check_payment(pay_data[i]["payment_id"], pay_data[i]["amount"]):
                 bot.send_message(i, "Ваш платеж успешно прошел!")
                 bot.send_message(
                     TG_ID_ADMIN,
                     f"Поступил платеж от: "
-                    f'{pay_data[i["name"]]}\n'
+                    f'{pay_data[i]["name"]}\n'
                     f"ID платежа: "
-                    f'{pay_data[i["payment_id"]]}\n'
+                    f'{pay_data[i]["payment_id"]}\n'
                     f"на сумму: "
-                    f'{pay_data[i["amount"]]}',
+                    f'{pay_data[i]["amount"]}',
                 )
                 requests.post(
                     PAYMENT_API + pay_data[i]["name"] + "/", timeout=5

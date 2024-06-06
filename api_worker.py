@@ -24,7 +24,7 @@ def get_payment(username):
     """
     Функция получает данные из API платежей
     """
-    data_no_json = requests.get(PAYMENT_API + username + '/', timeout=5).text
+    data_no_json = requests.get(PAYMENT_API + username + "/", timeout=5).text
     amount = json.loads(data_no_json)
     return amount
 

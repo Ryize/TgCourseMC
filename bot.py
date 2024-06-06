@@ -7,17 +7,20 @@ import os
 
 import requests
 
-import billing
 from admin import admin_actions
 from api_worker import get_data, get_payment
+from billing import get_payment_url
 from config import bot
 from keyboard_mixin import KeyboardMixin
-from models import *
-from thread import TG_ID_ADMIN
+from models import User
+
+TG_ID_ADMIN = 814401631
 
 kb = KeyboardMixin()
 
 temp_data = {}
+pay_data = {}
+number_of_passes = {}
 
 
 @bot.message_handler(commands=["start"])
@@ -27,20 +30,21 @@ def welcome(message):
     выдает приветственное сообщение и сравнивает tg id пользователя с tg id
     в таблице users.db. Если tg id пользователя есть в базе, то пользователю
     выдаётся клавиатура users_kb, иначе выдаёт кнопку "Авторизация".
-    Если в бота зашёл админ, то она сравнивает его tg id c id админа в базе и
+    Если зашёл админ, то она сравнивает его tg id c id админа в базе и
     если id совпало, бот выдаёт приветствие админу и его индивидуальную
     клавиатуру.
     """
-    user = User.select().where(User.chat_id == message.chat.id).first()
-    if user.chat_id == TG_ID_ADMIN:
-        admin_actions(message, user)
-    elif user:
-        bot.send_message(
-            message.chat.id,
-            f"Здравствуй, {user.name}",
-            reply_markup=kb.user_kb(),
-        )
-    else:
+    try:
+        user = User.select().where(User.chat_id == message.chat.id).first()
+        if user.chat_id == TG_ID_ADMIN:
+            admin_actions(message, user)
+        elif user:
+            bot.send_message(
+                message.chat.id,
+                f"Здравствуй, {user.name}",
+                reply_markup=kb.user_kb(),
+            )
+    except AttributeError:
         bot.send_message(
             message.chat.id,
             "Добро пожаловать в бота CourceMC!\n"
@@ -96,8 +100,9 @@ def check_autorization(message):
             f'Привет, {temp_data[message.chat.id]["login"]}!',
             reply_markup=kb.user_kb(),
         )
-        user = User(chat_id=message.chat.id, name=temp_data[message.chat.id]
-        ["login"])
+        user = User(
+            chat_id=message.chat.id, name=temp_data[message.chat.id]["login"]
+        )
 
         user.save()
         temp_data[message.chat.id] = {}
@@ -121,15 +126,15 @@ def button_ping(message):
     bot.send_message(message.chat.id, "Понг ⚾")
 
 
-@bot.message_handler(func=lambda message: message.text ==
-                                          "Пропустить занятие 💤")
+@bot.message_handler(
+    func=lambda message: message.text == "Пропустить занятие 💤"
+)
 def skip_lesson_buttons(message):
     """
     Функция принимает с клавиатуры user_kb сообщение о пропуске занятия(й) и
     выдаёт клавиатуру выбора количества занятий, которые пользователь желает
     пропустить.
     """
-    number_of_passes = {}
     bot.send_message(
         message.chat.id,
         "Сколько занятий хотите пропустить?",
@@ -142,7 +147,7 @@ def skip_lesson_buttons(message):
     def confirmation_skip_lesson(message):
         """
         Принимает данные с клавиатуры skip_lesson_kb, занося данные
-        о пропуске занятия(й) в  словарь number_of_passes с ключом
+        о пропуске занятия(й) в словарь number_of_passes с ключом
         "lessons". Также запрашивает подтверждение пользователя о
         пропуске занятия(й).
         """
@@ -157,7 +162,6 @@ def skip_lesson_buttons(message):
             number_of_passes["lessons"] = 2
         elif message.text == "3 💤💤💤":
             number_of_passes["lessons"] = 3
-
         @bot.message_handler(func=lambda message: message.text == "Да 👍")
         def pass_lesson(message):
             """
@@ -171,15 +175,16 @@ def skip_lesson_buttons(message):
             сообщает об успешной записи количества пропусков занятий и
             высылает ему клавиатуру user_kb.
             """
-            API_MISSING = os.getenv("API_MISSING")
-            user = (User.select().where(User.chat_id == message.chat.id)
-                    .first())
+            api_missing = os.getenv("API_MISSING")
+            user = User.select().where(User.chat_id == message.chat.id).first()
             date = datetime.date.today() + datetime.timedelta(days=1)
-            for i in range(number_of_passes["lessons"]):
+            for i in range(number_of_passes["lessons"]):#Для чего цикл если i не используется?
                 requests.post(
-                    API_MISSING,
-                    data={"username": user.name, "date": date.strftime(
-                        "%Y-%m-%d")},
+                    api_missing,
+                    data={
+                        "username": user.name,
+                        "date": date.strftime("%Y-%m-%d")
+                    }, timeout=5
                 )
                 date += datetime.timedelta(days=2)
             bot.send_message(
@@ -210,4 +215,13 @@ def skip_lesson_buttons(message):
 @bot.message_handler(func=lambda message: message.text == "Оплата 💰")
 def pay(message):
     user = User.select().where(User.chat_id == message.chat.id).first()
-    amount = get_payment(user.name)
+    amount = get_payment(user.name)["amount"]
+    payment = get_payment_url(amount)
+    bot.send_message(
+        message.chat.id, f"Оплатите {amount} рублей, по ссылке: {payment[0]}"
+    )
+    pay_data[message.chat.id] = {
+        "amount": amount,
+        "payment_id": payment[1],
+        "name": user.name,
+    }

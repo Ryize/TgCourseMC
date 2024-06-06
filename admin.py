@@ -10,9 +10,10 @@ kb = KeyboardMixin()
 
 def admin_actions(message, user):
     """
-    В этой функции бот здоровается с админом и кидает ему админовскую клавиатуру.
+    В этой функции бот здоровается с админом и кидает ему
+    админовскую клавиатуру.
     """
 
     bot.send_message(
-        message.chat.id, f"Здравствуй, {user.name}!", reply_markup=kb.admin_kb()
+        message.chat.id, f"Здравствуй, " f"{user.name}!", reply_markup=kb.admin_kb()
     )

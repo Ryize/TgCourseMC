@@ -5,14 +5,26 @@
 import os
 import uuid
 
+from typing import Union
 from yookassa import Configuration, Payment
 from yookassa.domain.exceptions import BadRequestError
+
 
 Configuration.account_id = os.environ.get("SHOP_ID")
 Configuration.secret_key = os.environ.get("SECRET_KEY")
 
 
-def get_payment_url(amount):
+def get_payment_url(amount: Union[int, float]) -> tuple[str, str]:
+    """
+    Функция создает платеж и возвращает URL для подтверждения платежа и
+    идентификатор платежа.
+
+    Args:
+        amount: сумма платежа.
+
+    Returns:
+        tuple: содержит URL для подтверждения платежа и идентификатор платежа.
+    """
     idempotence_key = str(uuid.uuid4())
     payment = Payment.create(
         {
@@ -41,7 +53,17 @@ def get_payment_url(amount):
     return payment.confirmation.confirmation_url, payment.id
 
 
-def check_payment(payment_id, amount):
+def check_payment(payment_id: str, amount: Union[int, float]) -> str:
+    """
+    Функция проверяет и осуществляет проведение платежа по заданному
+    идентификатору и сумме.
+
+    Args: payment_id: уникальный идентификатор платежа
+    amount: сумма платежа
+
+    Returns:
+    str: финальный статус платежа после попытки проведения.
+    """
     res = Payment.find_one(payment_id)
     if res.status == "pending":
         idempotence_key = str(uuid.uuid4())

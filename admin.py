@@ -11,7 +11,7 @@ kb = KeyboardMixin()
 def admin_actions(message, user):
     """
     В этой функции бот здоровается с админом и кидает ему
-    админовскую клавиатуру.
+    клавиатуру администратора.
     """
 
     bot.send_message(

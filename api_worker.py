@@ -1,5 +1,5 @@
 """
-Модуль отвечает за работу с api зарегестрированых пользователей сайта
+Модуль отвечает за работу с api, зарегистрированных пользователей сайта
 """
 
 import json
@@ -11,7 +11,7 @@ STUDENT_API = os.getenv("STUDENT_API")
 PAYMENT_API = os.getenv("PAYMENT_API")
 
 
-def get_data():
+def get_data() -> dict:
     """
     Функция получения донных из api.
     """
@@ -20,7 +20,7 @@ def get_data():
     return data
 
 
-def get_payment(username):
+def get_payment(username) -> dict:
     """
     Функция получает данные из API платежей
     """
@@ -29,7 +29,11 @@ def get_payment(username):
     return amount
 
 
-def get_application():
-    data_json = requests.get("https://coursemc.ru/api/v1/app_training/").text
+def get_application() -> dict:
+    """
+    Функция получает данные из API заявок
+    """
+    data_json = requests.get(
+        "https://coursemc.ru/api/v1/app_training/", timeout=5).text
     data = json.loads(data_json)
     return data

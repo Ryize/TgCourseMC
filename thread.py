@@ -34,12 +34,11 @@ Telegram-боте, таких как проверка новых заявок н
 """
 
 import os
-import threading
 import time
 
 import requests
 
-from api_worker import get_application
+from api_worker import get_application, get_review
 from billing import check_payment
 from bot import TG_ID_ADMIN, bot, pay_data
 from models import *
@@ -82,10 +81,6 @@ def get_training():
                 app.save()
 
 
-thread = threading.Thread(target=get_training)
-thread.start()
-
-
 def get_pay():
     """
     Функция периодически проверяет состояние платежей и отправляет уведомления
@@ -113,11 +108,28 @@ def get_pay():
                     f"на сумму: "
                     f'{pay_data[i]["amount"]}',
                 )
-                requests.post(
-                    PAYMENT_API + pay_data[i]["name"] + "/", timeout=5
-                )
+                requests.post(PAYMENT_API + pay_data[i]["name"] + "/", timeout=5)
                 pay_data[i] = {}
 
 
-thread = threading.Thread(target=get_pay)
-thread.start()
+def review():
+    while True:
+        time.sleep(5)
+        for i in get_review()["reviews"]:
+            rev = (
+                Review.select()
+                .where(Review.id_review == i["id"])
+                .first()
+            )
+            if rev:
+                pass
+            else:
+                bot.send_message(
+                    TG_ID_ADMIN,
+                    f"Пришёл проект на ревью!\n"
+                    f'Ссылка: {i["github"]}\n'
+                    f'Коментарий: {i["comment"]}\n'
+                )
+                rev = Review(id_review=i["id"])
+
+                rev.save()

@@ -62,7 +62,7 @@ def login(message):
     keyboard = telebot.types.ReplyKeyboardRemove()
     bot.send_message(
         message.chat.id, "Введите логин, указанный при регистрации на сайте.",
-    reply_markup=keyboard)
+        reply_markup=keyboard)
     bot.register_next_step_handler(message, password)
 
 
@@ -142,75 +142,78 @@ def skip_lesson_buttons(message):
         reply_markup=kb.skip_lesson_kb(),
     )
 
-    @bot.message_handler(
-        func=lambda message: message.text in ["1 💤", "2 💤💤", "3 💤💤💤"]
+
+@bot.message_handler(
+    func=lambda message: message.text in ["1 💤", "2 💤💤", "3 💤💤💤"])
+def confirmation_skip_lesson(message):
+    """
+    Принимает данные с клавиатуры skip_lesson_kb, занося данные
+    о пропуске занятия(й) в словарь number_of_passes с ключом
+    "lessons". Также запрашивает подтверждение пользователя о
+    пропуске занятия(й).
+    """
+    bot.send_message(
+        message.chat.id,
+        "Точно хотите пропустить занятие(я)?",
+        reply_markup=kb.skip_lesson_kb2(),
     )
-    def confirmation_skip_lesson(message):
-        """
-        Принимает данные с клавиатуры skip_lesson_kb, занося данные
-        о пропуске занятия(й) в словарь number_of_passes с ключом
-        "lessons". Также запрашивает подтверждение пользователя о
-        пропуске занятия(й).
-        """
-        bot.send_message(
-            message.chat.id,
-            "Точно хотите пропустить занятие(я)?",
-            reply_markup=kb.skip_lesson_kb2(),
+    if message.text == "1 💤":
+        number_of_passes["lessons"] = 1
+    elif message.text == "2 💤💤":
+        number_of_passes["lessons"] = 2
+    elif message.text == "3 💤💤💤":
+        number_of_passes["lessons"] = 3
+
+
+@bot.message_handler(func=lambda message: message.text == "Да 👍")
+def pass_lesson(message):
+    """
+    Действия бота при подтверждении пропуска занятий пользователем
+    по кнопке "Да 👍".
+
+    На сайт отправляется post запрос(ы) (в зависимости от
+    количества пропусков) с именем пользователя и датой пропуска
+    занятия(й). Также админу присылается уведомление о пропуске
+    занятия(й) определённым пользователем, а пользователю бот
+    сообщает об успешной записи количества пропусков занятий и
+    высылает ему клавиатуру user_kb.
+    """
+    api_missing = os.getenv("API_MISSING")
+    user = User.select().where(User.chat_id == message.chat.id).first()
+    date = datetime.date.today() + datetime.timedelta(days=1)
+    for _ in range(number_of_passes["lessons"]):
+        requests.post(
+            api_missing,
+            data={
+                "username": user.name,
+                "date": date.strftime("%Y-%m-%d")
+            }, timeout=5
         )
-        if message.text == "1 💤":
-            number_of_passes["lessons"] = 1
-        elif message.text == "2 💤💤":
-            number_of_passes["lessons"] = 2
-        elif message.text == "3 💤💤💤":
-            number_of_passes["lessons"] = 3
-        @bot.message_handler(func=lambda message: message.text == "Да 👍")
-        def pass_lesson(message):
-            """
-            Действия бота при подтверждении пропуска занятий пользователем
-            по кнопке "Да 👍".
+        date += datetime.timedelta(days=2)
+    bot.send_message(
+        TG_ID_ADMIN,
+        f"❗️ Ученик {user.name} пропускает"
+        f" {number_of_passes['lessons']} занятие(я) ❗️",
+    )
+    bot.send_message(
+        message.chat.id,
+        "Ваше количество пропусков занятий успешно записано!",
+        reply_markup=kb.user_kb(),
+    )
 
-            На сайт отправляется post запрос(ы) (в зависимости от
-            количества пропусков) с именем пользователя и датой пропуска
-            занятия(й). Также админу присылается уведомление о пропуске
-            занятия(й) определённым пользователем, а пользователю бот
-            сообщает об успешной записи количества пропусков занятий и
-            высылает ему клавиатуру user_kb.
-            """
-            api_missing = os.getenv("API_MISSING")
-            user = User.select().where(User.chat_id == message.chat.id).first()
-            date = datetime.date.today() + datetime.timedelta(days=1)
-            for i in range(number_of_passes["lessons"]):#Для чего цикл если i не используется?
-                requests.post(
-                    api_missing,
-                    data={
-                        "username": user.name,
-                        "date": date.strftime("%Y-%m-%d")
-                    }, timeout=5
-                )
-                date += datetime.timedelta(days=2)
-            bot.send_message(
-                TG_ID_ADMIN,
-                f"❗️ Ученик {user.name} пропускает"
-                f" {number_of_passes['lessons']} занятие(я) ❗️",
-            )
-            bot.send_message(
-                message.chat.id,
-                "Ваше количество пропусков занятий успешно записано!",
-                reply_markup=kb.user_kb(),
-            )
 
-        @bot.message_handler(func=lambda message: message.text == "Нет 👎")
-        def no_pass_lesson(message):
-            """
-            Если пользователь передумал и отказался пропускать занятие(я),
-            нажав на кнопку "Нет 👎", ему бот отсылает сообщение и высылает
-            клавиатуру user_kb.
-            """
-            bot.send_message(
-                message.chat.id,
-                "Хорошо, что вы отказались пропускать занятие(я) 👍👍👍",
-                reply_markup=kb.user_kb(),
-            )
+@bot.message_handler(func=lambda message: message.text == "Нет 👎")
+def no_pass_lesson(message):
+    """
+    Если пользователь передумал и отказался пропускать занятие(я),
+    нажав на кнопку "Нет 👎", ему бот отсылает сообщение и высылает
+    клавиатуру user_kb.
+    """
+    bot.send_message(
+        message.chat.id,
+        "Хорошо, что вы отказались пропускать занятие(я) 👍👍👍",
+        reply_markup=kb.user_kb(),
+    )
 
 
 @bot.message_handler(func=lambda message: message.text == "Оплата 💰")

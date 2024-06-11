@@ -9,7 +9,8 @@ import requests
 
 STUDENT_API = os.getenv("STUDENT_API")
 PAYMENT_API = os.getenv("PAYMENT_API")
-
+APPLICATION_API = os.getenv("APPLICATION_API")
+REVIEW_API = os.getenv("REVIEW_API")
 
 def get_data() -> dict:
     """
@@ -34,6 +35,13 @@ def get_application() -> dict:
     Функция получает данные из API заявок
     """
     data_json = requests.get(
-        "https://coursemc.ru/api/v1/app_training/", timeout=5).text
+        APPLICATION_API, timeout=5).text
+    data = json.loads(data_json)
+    return data
+
+
+def get_review() -> dict:
+    data_json = requests.get(
+        REVIEW_API, timeout=5).text
     data = json.loads(data_json)
     return data

@@ -4,9 +4,9 @@
 
 import datetime
 import os
-import telebot
 
 import requests
+import telebot
 
 from admin import admin_actions
 from api_worker import get_data, get_payment
@@ -37,10 +37,7 @@ def welcome(message):
     """
     try:
         user = User.select().where(User.chat_id == message.chat.id).first()
-        bot.send_message(
-            message.chat.id,
-            f"Здравствуй, {user.name}"
-        )
+        bot.send_message(message.chat.id, f"Здравствуй, {user.name}")
     except AttributeError:
         bot.send_message(
             message.chat.id,
@@ -61,8 +58,10 @@ def login(message):
     temp_data[message.chat.id] = {}
     keyboard = telebot.types.ReplyKeyboardRemove()
     bot.send_message(
-        message.chat.id, "Введите логин, указанный при регистрации на сайте.",
-        reply_markup=keyboard)
+        message.chat.id,
+        "Введите логин, указанный при регистрации на сайте.",
+        reply_markup=keyboard,
+    )
     bot.register_next_step_handler(message, password)
 
 
@@ -94,8 +93,7 @@ def check_autorization(message):
             flag = True
     if flag:
         user = User(
-            chat_id=message.chat.id, name=temp_data[message.chat.id]["login"]
-        )
+            chat_id=message.chat.id, name=temp_data[message.chat.id]["login"])
 
         user.save()
         if message.chat.id == TG_ID_ADMIN:
@@ -128,8 +126,7 @@ def button_ping(message):
 
 
 @bot.message_handler(
-    func=lambda message: message.text == "Пропустить занятие 💤"
-)
+    func=lambda message: message.text == "Пропустить занятие 💤")
 def skip_lesson_buttons(message):
     """
     Функция принимает с клавиатуры user_kb сообщение о пропуске занятия(й) и
@@ -144,7 +141,8 @@ def skip_lesson_buttons(message):
 
 
 @bot.message_handler(
-    func=lambda message: message.text in ["1 💤", "2 💤💤", "3 💤💤💤"])
+    func=lambda message: message.text in ["1 💤", "2 💤💤", "3 💤💤💤"]
+)
 def confirmation_skip_lesson(message):
     """
     Принимает данные с клавиатуры skip_lesson_kb, занося данные
@@ -184,10 +182,8 @@ def pass_lesson(message):
     for _ in range(number_of_passes["lessons"]):
         requests.post(
             api_missing,
-            data={
-                "username": user.name,
-                "date": date.strftime("%Y-%m-%d")
-            }, timeout=5
+            data={"username": user.name, "date": date.strftime("%Y-%m-%d")},
+            timeout=5,
         )
         date += datetime.timedelta(days=2)
     bot.send_message(
@@ -231,7 +227,7 @@ def pay(message):
     user = User.select().where(User.chat_id == message.chat.id).first()
     amount = get_payment(user.name)["amount"]
     if amount <= 0:
-        bot.send_message(message.chat.id, 'Вы уже оплатили занятия!')
+        bot.send_message(message.chat.id, "Вы уже оплатили занятия!")
         return
     payment = get_payment_url(amount)
     bot.send_message(

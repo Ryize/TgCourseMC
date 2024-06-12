@@ -18,8 +18,8 @@ def admin_actions(message, user):
     """
 
     bot.send_message(
-        message.chat.id, f"Здравствуй,"
-                         f" {user.name}!", reply_markup=kb.admin_kb()
+        message.chat.id,
+        f"Здравствуй," f" {user.name}!", reply_markup=kb.admin_kb()
     )
 
 
@@ -58,4 +58,4 @@ def send_message_to_all_users(message):
         if i.chat_id == TG_ID_ADMIN:
             pass
         else:
-            bot.send_message(i.chat_id, f'Админинстратор: {message.text}')
+            bot.send_message(i.chat_id, f"Админинстратор: {message.text}")

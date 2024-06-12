@@ -113,14 +113,19 @@ def get_pay():
 
 
 def review():
+    """
+    Функция периодически проверяет наличие новых отзывов и отправляет
+    уведомления администратору о новых отзывах.
+
+    Функция работает в бесконечном цикле с периодом 60 секунд. На каждой
+    итерации проверяет наличие новых отзывов с помощью функции get_review().
+    Если обнаруживается новый отзыв, отправляется уведомление администратору
+    с деталями отзыва, и отзыв сохраняется в базу данных.
+    """
     while True:
-        time.sleep(5)
+        time.sleep(60)
         for i in get_review()["reviews"]:
-            rev = (
-                Review.select()
-                .where(Review.id_review == i["id"])
-                .first()
-            )
+            rev = Review.select().where(Review.id_review == i["id"]).first()
             if rev:
                 pass
             else:
@@ -128,7 +133,7 @@ def review():
                     TG_ID_ADMIN,
                     f"Пришёл проект на ревью!\n"
                     f'Ссылка: {i["github"]}\n'
-                    f'Коментарий: {i["comment"]}\n'
+                    f'Коментарий: {i["comment"]}\n',
                 )
                 rev = Review(id_review=i["id"])
 

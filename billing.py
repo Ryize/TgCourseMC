@@ -4,11 +4,10 @@
 
 import os
 import uuid
-
 from typing import Union
+
 from yookassa import Configuration, Payment
 from yookassa.domain.exceptions import BadRequestError
-
 
 Configuration.account_id = os.environ.get("SHOP_ID")
 Configuration.secret_key = os.environ.get("SECRET_KEY")

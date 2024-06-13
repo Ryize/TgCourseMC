@@ -32,5 +32,11 @@ import os
 
 import telebot
 
-TOKEN = os.getenv("TOKEN")
+STUDENT_API = os.getenv('STUDENT_API')
+PAYMENT_API = os.getenv('PAYMENT_API')
+APPLICATION_API = os.getenv('APPLICATION_API')
+REVIEW_API = os.getenv('REVIEW_API')
+TOKEN = os.getenv('TOKEN')
 bot = telebot.TeleBot(TOKEN)
+account_id = os.environ.get('SHOP_ID')
+secret_key = os.environ.get('SECRET_KEY')

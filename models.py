@@ -4,7 +4,7 @@
 
 from peewee import *
 
-db = SqliteDatabase("users.db")
+db = SqliteDatabase('users.db')
 
 
 class BaseModel(Model):
@@ -41,7 +41,7 @@ class User(BaseModel):
         """
         Метакласс для определения имени таблицы.
         """
-        db_table = "users"
+        db_table = 'users'
 
 
 class Application(BaseModel):
@@ -57,7 +57,7 @@ class Application(BaseModel):
         """
         Метакласс для определения имени таблицы.
         """
-        db_table = "applications"
+        db_table = 'applications'
 
 
 class Review(BaseModel):
@@ -73,7 +73,7 @@ class Review(BaseModel):
         """
         Метакласс для определения имени таблицы.
         """
-        db_table = "reviews"
+        db_table = 'reviews'
 
 
 db.create_tables([User, Application, Review])

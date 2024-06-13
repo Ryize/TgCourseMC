@@ -3,14 +3,10 @@
 """
 
 import json
-import os
 
 import requests
 
-STUDENT_API = os.getenv("STUDENT_API")
-PAYMENT_API = os.getenv("PAYMENT_API")
-APPLICATION_API = os.getenv("APPLICATION_API")
-REVIEW_API = os.getenv("REVIEW_API")
+from config import STUDENT_API, PAYMENT_API, APPLICATION_API, REVIEW_API
 
 
 def get_data() -> dict:
@@ -26,7 +22,8 @@ def get_payment(username) -> dict:
     """
     Функция получает данные из API платежей
     """
-    data_no_json = requests.get(PAYMENT_API + username + "/", timeout=5).text
+    data_no_json = requests.get(
+        f'{PAYMENT_API}{username}/', timeout=5).text
     amount = json.loads(data_no_json)
     return amount
 

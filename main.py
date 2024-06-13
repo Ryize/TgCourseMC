@@ -8,13 +8,10 @@ if __name__ == "__main__":
     from bot import bot
     from thread import get_pay, get_training, review
 
-    print("Бот запущен!")
-    thread = threading.Thread(target=get_training)
-    thread.start()
-    thread = threading.Thread(target=get_pay)
-    thread.start()
-    thread = threading.Thread(target=review)
-    thread.start()
+    print('Бот запущен!')
+    threading.Thread(target=get_training).start()
+    threading.Thread(target=get_pay).start()
+    threading.Thread(target=review).start()
     while True:
         try:
             bot.infinity_polling()

@@ -1,5 +1,5 @@
 """
-Модуль содержит клавиатуры, используемые.
+Модуль содержит клавиатуры, используемые в телеграм-боте.
 """
 
 from telebot import types
@@ -7,64 +7,82 @@ from telebot import types
 
 class KeyboardMixin:
     """
-    Клас содержит основные клавиатуры, используемые в боте.
+    Класс содержит основные клавиатуры, используемые в боте.
     """
 
     @staticmethod
-    def main_kb():
+    def main_kb() -> types.ReplyKeyboardMarkup:
         """
-        Клавиатура авторизации
+        Создает клавиатуру авторизации.
+
+        Returns:
+            types.ReplyKeyboardMarkup: Клавиатура с кнопкой "Авторизация🔑".
         """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Авторизация🔑")
+        btn1 = types.KeyboardButton('Авторизация🔑')
         kb.row(btn1)
         return kb
 
     @staticmethod
-    def user_kb():
+    def user_kb() -> types.ReplyKeyboardMarkup:
         """
-        Клавиатура действий, доступных для пользователя.
+        Создает клавиатуру авторизации.
+
+        Returns:
+            types.ReplyKeyboardMarkup: Клавиатура с кнопкой "Авторизация🔑".
         """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Оплата 💰")
-        btn2 = types.KeyboardButton("Пропустить занятие 💤")
-        btn3 = types.KeyboardButton("Пинг ⚾")
+        btn1 = types.KeyboardButton('Оплата 💰')
+        btn2 = types.KeyboardButton('Пропустить занятие 💤')
+        btn3 = types.KeyboardButton('Пинг ⚾')
         kb.row(btn1, btn3)
         kb.row(btn2)
         return kb
 
     @staticmethod
-    def skip_lesson_kb():
+    def skip_lesson_kb() -> types.ReplyKeyboardMarkup:
         """
-        Клавиатура пропуска занятия или занятий.
+        Создает клавиатуру пропуска занятия или занятий.
+
+        Returns:
+            types.ReplyKeyboardMarkup: Клавиатура с кнопками "1 💤",
+            "2 💤💤" и "3 💤💤💤".
         """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton(" 1 💤")
-        btn2 = types.KeyboardButton(" 2 💤💤")
-        btn3 = types.KeyboardButton(" 3 💤💤💤")
+        btn1 = types.KeyboardButton(' 1 💤')
+        btn2 = types.KeyboardButton(' 2 💤💤')
+        btn3 = types.KeyboardButton(' 3 💤💤💤')
         kb.row(btn1, btn2, btn3)
         return kb
 
     @staticmethod
-    def skip_lesson_kb2():
+    def skip_lesson_kb2() -> types.ReplyKeyboardMarkup:
         """
-        Клавиатура подтверждения пропуска занятия.
+        Создает клавиатуру подтверждения пропуска занятия.
+
+        Returns:
+            types.ReplyKeyboardMarkup: Клавиатура с кнопками "Да 👍"
+            и "Нет 👎".
         """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Да 👍")
-        btn2 = types.KeyboardButton("Нет 👎")
+        btn1 = types.KeyboardButton('Да 👍')
+        btn2 = types.KeyboardButton('Нет 👎')
         kb.row(btn1, btn2)
         return kb
 
     @staticmethod
-    def admin_kb():
+    def admin_kb() -> types.ReplyKeyboardMarkup:
         """
-        Клавиатура администратора.
+        Создает клавиатуру администратора.
+
+        Returns:
+            types.ReplyKeyboardMarkup: Клавиатура с кнопками "Заявки 📝",
+            "Отправить сообщение всем 📣" и "Пинг ⚾".
         """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton("Заявки 📝")
-        btn2 = types.KeyboardButton("Отправить сообщение всем 📣")
-        btn3 = types.KeyboardButton("Пинг ⚾")
+        btn1 = types.KeyboardButton('Заявки 📝')
+        btn2 = types.KeyboardButton('Отправить сообщение всем 📣')
+        btn3 = types.KeyboardButton('Пинг ⚾')
         kb.row(btn1, btn3)
         kb.row(btn2)
         return kb

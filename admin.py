@@ -19,12 +19,12 @@ def admin_actions(message, user):
 
     bot.send_message(
         message.chat.id,
-        f"Здравствуй," f" {user.name}!", reply_markup=kb.admin_kb()
+        f'Здравствуй, {user.name}!', reply_markup=kb.admin_kb()
     )
 
 
 @bot.message_handler(
-    func=lambda message: message.text == "Отправить сообщение всем 📣")
+    func=lambda message: message.text == 'Отправить сообщение всем 📣')
 def message_admin(message):
     """
     Обработчик сообщений для администратора.
@@ -38,7 +38,7 @@ def message_admin(message):
         message (telebot.types.Message):
         Сообщение, отправленное администратором.
     """
-    bot.send_message(TG_ID_ADMIN, "Введите текст: ")
+    bot.send_message(TG_ID_ADMIN, 'Введите текст: ')
     bot.register_next_step_handler(message, send_message_to_all_users)
 
 
@@ -58,4 +58,4 @@ def send_message_to_all_users(message):
         if i.chat_id == TG_ID_ADMIN:
             pass
         else:
-            bot.send_message(i.chat_id, f"Админинстратор: {message.text}")
+            bot.send_message(i.chat_id, f'Админинстратор: {message.text}')

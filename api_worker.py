@@ -9,9 +9,12 @@ import requests
 from config import STUDENT_API, PAYMENT_API, APPLICATION_API, REVIEW_API
 
 
-def get_data() -> dict:
+def get_student() -> dict:
     """
-    Функция получения донных из api.
+    Получает данные о студентах из API.
+
+    Returns:
+        dict: Данные студентов в виде словаря.
     """
     data_no_json = requests.get(STUDENT_API, timeout=5).text
     data = json.loads(data_no_json)
@@ -20,7 +23,13 @@ def get_data() -> dict:
 
 def get_payment(username) -> dict:
     """
-    Функция получает данные из API платежей
+    Получает данные о платежах пользователя из API.
+
+    Args:
+        username (str): Имя пользователя.
+
+    Returns:
+        dict: Данные о платежах пользователя в виде словаря.
     """
     data_no_json = requests.get(
         f'{PAYMENT_API}{username}/', timeout=5).text
@@ -30,7 +39,10 @@ def get_payment(username) -> dict:
 
 def get_application() -> dict:
     """
-    Функция получает данные из API заявок
+    Получает данные о заявках из API.
+
+    Returns:
+        dict: Данные о заявках в виде словаря.
     """
     data_json = requests.get(APPLICATION_API, timeout=5).text
     data = json.loads(data_json)
@@ -39,7 +51,10 @@ def get_application() -> dict:
 
 def get_review() -> dict:
     """
-    Функция получает данные из API ревью
+    Получает данные о ревью из API.
+
+    Returns:
+        dict: Данные о ревью в виде словаря.
     """
     data_json = requests.get(REVIEW_API, timeout=5).text
     data = json.loads(data_json)

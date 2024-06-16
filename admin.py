@@ -53,9 +53,7 @@ def send_message_to_all_users(message):
         message (telebot.types.Message): Сообщение с текстом, который нужно
         отправить всем пользователям.
     """
-    user = User.select()
+    user = User.select().where(User.chat_id != TG_ID_ADMIN)
     for i in user:
-        if i.chat_id == TG_ID_ADMIN:
-            pass
-        else:
-            bot.send_message(i.chat_id, f'Админинстратор: {message.text}')
+        bot.send_message(i.chat_id, f'Админинстратор: {message.text}')
+    bot.send_message(TG_ID_ADMIN, 'Успешно отправлено!')

@@ -65,9 +65,7 @@ def get_training():
                 .where(Application.id_application == i['id'])
                 .first()
             )
-            if app:
-                pass
-            else:
+            if not app:
                 bot.send_message(
                     TG_ID_ADMIN,
                     f'У вас новая заявка!\n'
@@ -126,9 +124,7 @@ def review():
         time.sleep(60)
         for i in get_review()['reviews']:
             rev = Review.select().where(Review.id_review == i['id']).first()
-            if rev:
-                pass
-            else:
+            if not rev:
                 bot.send_message(
                     TG_ID_ADMIN,
                     f'Пришёл проект на ревью!\n'

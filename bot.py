@@ -2,7 +2,6 @@
 Модуль с логикой работы бота
 """
 
-
 import datetime
 import os
 
@@ -10,7 +9,7 @@ import requests
 import telebot
 
 from admin import admin_actions
-from api_worker import get_data, get_payment
+from api_worker import get_student, get_payment
 from billing import get_payment_url
 from config import bot
 from keyboard_mixin import KeyboardMixin
@@ -36,7 +35,6 @@ def welcome(message):
     если id совпало, бот выдаёт приветствие админу и его индивидуальную
     клавиатуру.
     """
-
     try:
         user = User.select().where(User.chat_id == message.chat.id).first()
         bot.send_message(message.chat.id, f'Здравствуй, {user.name}')
@@ -86,7 +84,7 @@ def check_autorization(message):
     при не совпадении - сообщение с ошибкой.
     """
     temp_data[message.chat.id]['password'] = message.text
-    for i in get_data():
+    for i in get_student():
         if (
             i['name'] == temp_data[message.chat.id]['login']
             and i['password'] == temp_data[message.chat.id]['password']

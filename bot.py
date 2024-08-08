@@ -37,7 +37,11 @@ def welcome(message):
     """
     try:
         user = User.select().where(User.chat_id == message.chat.id).first()
-        bot.send_message(message.chat.id, f'Здравствуй, {user.name}')
+        keyboard = kb.user_kb()
+        if message.chat.id == TG_ID_ADMIN:
+            keyboard = kb.admin_kb()
+        bot.send_message(message.chat.id, f'Здравствуй, {user.name}',
+                         reply_markup=keyboard)
     except AttributeError:
         bot.send_message(
             message.chat.id,
@@ -86,8 +90,8 @@ def check_autorization(message):
     temp_data[message.chat.id]['password'] = message.text
     for i in get_student():
         if (
-            i['name'] == temp_data[message.chat.id]['login']
-            and i['password'] == temp_data[message.chat.id]['password']
+                i['name'] == temp_data[message.chat.id]['login']
+                and i['password'] == temp_data[message.chat.id]['password']
         ):
             user = User(
                 chat_id=message.chat.id,
@@ -238,3 +242,11 @@ def pay(message):
         'payment_id': payment[1],
         'name': user.name,
     }
+
+@bot.message_handler()
+def unknown_command(message):
+    keyboard = kb.user_kb()
+    if message.chat.id == TG_ID_ADMIN:
+        keyboard = kb.admin_kb()
+    bot.send_message(message.chat.id, f'🧐 Я вас не понял...',
+                     reply_markup=keyboard)

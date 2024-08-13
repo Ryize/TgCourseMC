@@ -1,7 +1,7 @@
 """
 Модуль с логикой работы действий админа.
 """
-
+from api_worker import get_application
 from config import bot
 from keyboard_mixin import KeyboardMixin
 from models import User
@@ -42,6 +42,32 @@ def message_admin(message):
     bot.register_next_step_handler(message, send_message_to_all_users)
 
 
+@bot.message_handler(
+    func=lambda message: message.text == 'Заявки 📝')
+def application_admin(message):
+    """
+    Обработчик сообщений для администратора.
+
+    Когда администратор отправляет сообщение с текстом "Заявки 📝",
+    бот получает все активные заявки с платформы и отправляет в чат
+    администратору.
+
+    Args:
+        message (telebot.types.Message):
+        Сообщение, отправленное администратором.
+    """
+    applications = get_application()
+    for app in applications:
+        bot.send_message(
+            TG_ID_ADMIN,
+            f'У вас новая заявка!\n'
+            f'Имя: {app["name"]}\n'
+            f'Контакт: {app["contact"]}\n'
+            f'Почта: {app["email"]}\n'
+            f'Дата заявки: {app["created_at"]}',
+        )
+
+
 def send_message_to_all_users(message):
     """
     Отправляет сообщение всем пользователям.
@@ -55,5 +81,5 @@ def send_message_to_all_users(message):
     """
     user = User.select().where(User.chat_id != TG_ID_ADMIN)
     for i in user:
-        bot.send_message(i.chat_id, f'Админинстратор: {message.text}')
+        bot.send_message(i.chat_id, f'Администратор: {message.text}')
     bot.send_message(TG_ID_ADMIN, 'Успешно отправлено!')

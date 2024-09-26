@@ -59,3 +59,40 @@ def get_review() -> dict:
     data_json = requests.get(REVIEW_API, timeout=5).text
     data = json.loads(data_json)
     return data
+
+
+def get_questions(category: str, amount: int, difficulty: int = None) -> dict:
+    """
+    Получает данные о вопросах из API.
+
+    Args:
+        category (str): тема вопросов.
+        amount (int): количество вопросов.
+        difficulty (int, optional): Уровень сложности. Если не указан, не включается в запрос.
+
+    Returns:
+        dict: Вопросы в виде словаря.
+    """
+    if difficulty is None:
+        data = json.loads(requests.get(
+            f'https://coursemc.ru/api/v1/interview_question/?category={category}&amount={amount}').text)
+        return data
+    data = json.loads(requests.get(
+        f'https://coursemc.ru/api/v1/interview_question/'
+        f'?category={category}&amount={amount}&level={difficulty}').text)
+    return data
+
+
+def get_weekday_timetable(weekday: str):
+    """
+    Получает расписание занятий на конкретный день недели.
+
+    Args:
+        weekday (str): День недели. Пишется на русском языке с большой буквы.
+        Пример: Понедельник, Вторник и т.д.
+    """
+    data = json.loads(
+        requests.get(
+            f'https://coursemc.ru/api/v1/classes_timetable_weekday/{weekday}/').text
+    )
+    return data

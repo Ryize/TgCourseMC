@@ -96,3 +96,39 @@ def get_weekday_timetable(weekday: str):
             f'https://coursemc.ru/api/v1/classes_timetable_weekday/{weekday}/').text
     )
     return data
+
+
+def get_interview_question() -> str:
+    """
+    Получает вопрос для сервиса с GPT.
+
+    Returns:
+        str: вопрос
+    """
+    data = json.loads(
+        requests.get(
+            f'https://coursemc.ru/api/v1/ai_get_question/').text
+    )
+    return data['question']
+
+
+def check_interview_question(question: str, answer: str) -> str:
+    """
+    Отправляет вопрос и ответ пользователя для проверки.
+
+    Args:
+        question (str): вопрос
+        answer (str): ответ пользователя
+
+    Returns:
+        str: результат оценки
+    """
+    entered_data = {
+            'question': question,
+            'answer': answer,
+        }
+    data = requests.get(
+            f'https://coursemc.ru/api/v1/ai_check_question/',
+            params=entered_data).text
+    data = json.loads(data)
+    return data['score']

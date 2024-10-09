@@ -1,6 +1,8 @@
 """
 Модуль отвечает за создание таблиц базы данных посредством ORM PEEWEE
 """
+import datetime
+
 from peewee import *
 
 db = SqliteDatabase('users.db')
@@ -75,4 +77,25 @@ class Review(BaseModel):
         db_table = 'reviews'
 
 
-db.create_tables([User, Application, Review])
+def current_date():
+    return datetime.datetime.now().date()
+
+
+class Interview(BaseModel):
+    """
+    Модель для хранения информации о запросах к сервису Твой Собес (GPT).
+
+    Атрибуты:
+        id_review (IntegerField): Уникальный идентификатор отзыва.
+    """
+    chat_id = IntegerField()
+    date = DateField(default=current_date)
+
+    class Meta:
+        """
+        Метакласс для определения имени таблицы.
+        """
+        db_table = 'interview'
+
+
+db.create_tables([User, Application, Review, Interview])

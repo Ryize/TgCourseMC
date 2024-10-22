@@ -9,19 +9,22 @@ import requests
 import telebot
 
 from admin import admin_actions
-from api_worker import get_student, get_payment
+from api_worker import get_student, get_payment, get_questions, \
+    get_interview_question, check_interview_question
 from billing import get_payment_url
 from config import bot
 from keyboard_mixin import KeyboardMixin
-from models import User
+from models import User, Interview, current_date
 
 TG_ID_ADMIN = 814401631
 
 kb = KeyboardMixin()
 
 temp_data = {}
+interview_data = {}
 pay_data = {}
 number_of_passes = {}
+interview_question = {}
 
 
 @bot.message_handler(commands=['start'])
@@ -243,10 +246,183 @@ def pay(message):
         'name': user.name,
     }
 
+
+@bot.message_handler(func=lambda message: message.text == 'Твой собес 👨‍💻')
+def check_category_interview_button(message):
+    """
+    Действия бота при нажатии кнопки 'Твой собес'.
+    Вызывает следующую клавиатуру.
+    """
+    chat_id = message.chat.id
+    bot.send_message(chat_id, f'Выберите категорию вопросов:',
+                     reply_markup=kb.check_category_interview())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Вопросы')
+def interview_button(message):
+    """
+    Действия бота при нажатии кнопки 'Вопросы'.
+    Вызывает следующую клавиатуру.
+    """
+    chat_id = message.chat.id
+    bot.send_message(chat_id, f'Выберите категорию вопросов:',
+                     reply_markup=kb.category_kb())
+
+
+@bot.message_handler(func=lambda message: message.text == 'AI Собес')
+def interview_question_ai_assistant_button(message):
+    """
+    Действия бота при нажатии кнопки 'AI Собес'.
+    Вызывает следующую клавиатуру.
+    """
+    chat_id = message.chat.id
+
+    amount_current_day = list(
+        Interview.select().where(Interview.chat_id == chat_id,
+                                 Interview.date == current_date())) or '0'
+    if len(amount_current_day) >= 10:
+        bot.send_message(chat_id,
+                         'Вы израсходовали лимит на запросы. Попробуйте завтра!')
+        return
+    question = get_interview_question()
+    keyboard = telebot.types.ReplyKeyboardRemove()
+    bot.send_message(chat_id, f'Вопрос:\n{question}', reply_markup=keyboard)
+    interview_question[chat_id] = question
+    bot.register_next_step_handler(message,
+                                   interview_check_ai_assistant_button)
+
+
+def interview_check_ai_assistant_button(message):
+    """
+    Получает вопрос и ответ пользователя и отправляет эти данные на
+    оценку (API).
+    """
+    chat_id = message.chat.id
+    question = interview_question[chat_id]
+    answer = message.text
+
+    msg = bot.send_message(chat_id, '⚙️ Ожидание...')
+    result = check_interview_question(question, answer)
+    interview = Interview(chat_id=chat_id)
+    interview.save()
+
+    amount_current_day = list(
+        Interview.select().where(Interview.chat_id == chat_id,
+                                 Interview.date == current_date())) or '0'
+    request_text = 'запрос'
+    left = 10 - len(amount_current_day)
+    if 2 <= left <= 4:
+        request_text += 'а'
+    elif left > 4:
+        request_text += 'ов'
+    bot.edit_message_text(chat_id=chat_id,
+                          message_id=msg.message_id,
+                          text=f'Сегодня осталось {left} '
+                               f'{request_text}!',
+                          reply_markup=kb.next_ai_interview())
+
+    keyboard = kb.user_kb()
+    if message.chat.id == TG_ID_ADMIN:
+        keyboard = kb.admin_kb()
+
+    bot.send_message(chat_id, text=f'Результат: {result}',
+                     reply_markup=keyboard)
+
+
+@bot.message_handler(func=lambda message: message.text == 'Python')
+def interview_button_Python(message):
+    """
+    Действия бота при нажатии кнопки 'Python'.
+    Вызывает следующую клавиатуру.
+    """
+    chat_id = message.chat.id
+    bot.send_message(chat_id, 'Укажите сложность вопросов:',
+                     reply_markup=kb.difficulty_kb())
+
+
+@bot.message_handler(
+    func=lambda message: message.text in ['1-3', '1-5', '1-7', '3-5', '5-7',
+                                          '7-9'])
+def interview_difficult_python(message):
+    """
+    Действия бота при выборе сложности вопросов уровня Python.
+    """
+    chat_id = message.chat.id
+    interview_data[chat_id] = {
+        'category': 'Python',
+        'difficulty': message.text,
+        'Python': True,
+    }
+    bot.send_message(chat_id,
+                     'Укажите количество вопросов:',
+                     reply_markup=kb.amount_question_kb())
+    bot.register_next_step_handler(message, interview_question_amount)
+
+
+@bot.message_handler(
+    func=lambda message: message.text in ['HR’ские', 'Django', 'ООП'])
+def interview_button_another(message):
+    """
+    Действия бота при нажатии кнопки 'HR', 'Django', 'ООП'.
+    Уточняет количество вопросов, сохраняет chat_id в temp_data.
+    """
+    chat_id = message.chat.id
+    interview_data[chat_id] = {
+        'category': message.text,
+        'Python': False,
+    }
+    bot.send_message(chat_id,
+                     'Укажите количество вопросов:',
+                     reply_markup=kb.amount_question_kb())
+    bot.register_next_step_handler(message, interview_question_amount)
+
+
+def interview_question_amount(message):
+    """
+    Действия бота после просьбы ввести количество вопросов.
+    Отправляет запрос по api к сайту, для вывода списка вопросов и дальнейшей
+    отправке боту.
+    """
+    chat_id = message.chat.id
+    amount: str = message.text
+    if amount.isdigit() and not (5 <= int(amount) <= 20):
+        bot.send_message(chat_id,
+                         '❌ Допустимое количество вопросов от 5 до 20')
+        bot.register_next_step_handler(message, interview_question_amount)
+        return
+    category = interview_data[chat_id]['category']
+    string = ''
+    if interview_data[chat_id]['Python']:
+        difficulty = interview_data[chat_id]['difficulty']
+        data = get_questions(category, amount, difficulty)
+    else:
+        data = get_questions(category, amount)
+
+    for k, i in enumerate(data):
+        string += f'{k + 1}) {i["title"]}\n'
+
+    keyboard = kb.user_kb()
+    if message.chat.id == TG_ID_ADMIN:
+        keyboard = kb.admin_kb()
+    bot.send_message(chat_id,
+                     f'Сгенерированные вопросы:\n{string}',
+                     reply_markup=keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'next_ai')
+def next_question_ai_interview(call):
+    """
+    Действия бота после нажатия кнопки '👉 Следующий вопрос'. Вызывает функцию
+    interview_question_ai_assistant_button.
+    """
+    message = call.message
+    interview_question_ai_assistant_button(message)
+
+
 @bot.message_handler()
 def unknown_command(message):
     keyboard = kb.user_kb()
     if message.chat.id == TG_ID_ADMIN:
         keyboard = kb.admin_kb()
-    bot.send_message(message.chat.id, f'🧐 Я вас не понял...',
+    bot.send_message(message.chat.id, '🧐 Я вас не понял...',
                      reply_markup=keyboard)

@@ -32,7 +32,6 @@ Telegram-боте, таких как проверка новых заявок н
     thread_payment = threading.Thread(target=get_pay)
     thread_payment.start()
 """
-import datetime
 import json
 import os
 import time
@@ -50,7 +49,7 @@ TOKEN = os.getenv('TOKEN')
 PAYMENT_API = os.getenv('PAYMENT_API')
 
 
-def get_training():
+def get_training() -> None:
     """
     Функция периодически проверяет наличие новых заявок на тренировки и
     отправляет уведомления администратору о новых заявках.
@@ -82,7 +81,7 @@ def get_training():
                 app.save()
 
 
-def get_pay():
+def get_pay() -> None:
     """
     Функция периодически проверяет состояние платежей и отправляет уведомления
     об успешно проведенных платежах.
@@ -114,7 +113,7 @@ def get_pay():
                 pay_data[i] = {}
 
 
-def review():
+def review() -> None:
     """
     Функция периодически проверяет наличие новых отзывов и отправляет
     уведомления администратору о новых отзывах.
@@ -140,7 +139,7 @@ def review():
                 rev.save()
 
 
-def send_timetable_to_administrator():
+def send_timetable_to_administrator() -> None:
     """
     Функция каждую полночь отправляет Администратору сообщение о всех уроков
     за текущий день.
@@ -187,7 +186,13 @@ def check_time(target_time_str: str) -> bool:
     return False
 
 
-def get_lesson_link():
+def get_lesson_link() -> str:
+    """
+    Возвращает ссылку на урок в Яндекс Телемост
+
+    Returns:
+        str: ссылка
+    """
     headers = {
         'Authorization': YANDEX_TOKEN,
         'Content-Type': 'application/json',
@@ -199,7 +204,7 @@ def get_lesson_link():
     return data['join_url']
 
 
-def send_lesson_link_to_group():
+def send_lesson_link_to_group() -> None:
     """
     Функция отправляет ссылку на урок в телемосте за 5 минут до начала занятия.
 

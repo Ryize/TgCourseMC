@@ -421,6 +421,9 @@ def next_question_ai_interview(call):
 
 @bot.message_handler()
 def unknown_command(message):
+    """
+    Обработчик неизвестной команды
+    """
     keyboard = kb.user_kb()
     if message.chat.id == TG_ID_ADMIN:
         keyboard = kb.admin_kb()

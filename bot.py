@@ -251,7 +251,6 @@ def pay(message):
 def check_category_interview_button(message):
     """
     Действия бота при нажатии кнопки 'Твой собес'.
-    Вызывает следующую клавиатуру.
     """
     chat_id = message.chat.id
     bot.send_message(chat_id, f'Выберите категорию вопросов:',
@@ -262,7 +261,6 @@ def check_category_interview_button(message):
 def interview_button(message):
     """
     Действия бота при нажатии кнопки 'Вопросы'.
-    Вызывает следующую клавиатуру.
     """
     chat_id = message.chat.id
     bot.send_message(chat_id, f'Выберите категорию вопросов:',
@@ -273,7 +271,6 @@ def interview_button(message):
 def interview_question_ai_assistant_button(message):
     """
     Действия бота при нажатии кнопки 'AI Собес'.
-    Вызывает следующую клавиатуру.
     """
     chat_id = message.chat.id
 
@@ -422,7 +419,7 @@ def next_question_ai_interview(call):
 @bot.message_handler()
 def unknown_command(message):
     """
-    Обработчик неизвестной команды
+    Обработчик неизвестной команды.
     """
     keyboard = kb.user_kb()
     if message.chat.id == TG_ID_ADMIN:

@@ -98,18 +98,21 @@ def get_weekday_timetable(weekday: str):
     return data
 
 
-def get_interview_question() -> str:
+def get_interview_question(category, amount=1, level=None) -> str:
     """
     Получает вопрос для сервиса с GPT.
 
     Returns:
         str: вопрос
     """
+    url = (f'https://coursemc.ru/api/v1/interview_question/?'
+           f'category={category}&amount={amount}')
+    if level:
+        url += f'&level={level}'
     data = json.loads(
-        requests.get(
-            f'https://coursemc.ru/api/v1/ai_get_question/').text
+        requests.get(url).text
     )
-    return data['question']
+    return data
 
 
 def check_interview_question(question: str, answer: str) -> str:
@@ -124,11 +127,11 @@ def check_interview_question(question: str, answer: str) -> str:
         str: результат оценки
     """
     entered_data = {
-            'question': question,
-            'answer': answer,
-        }
+        'question': question,
+        'answer': answer,
+    }
     data = requests.get(
-            f'https://coursemc.ru/api/v1/ai_check_question/',
-            params=entered_data).text
+        f'http://127.0.0.1:8000/api/v1/ai_check_question/',
+        params=entered_data).text
     data = json.loads(data)
     return data['score']

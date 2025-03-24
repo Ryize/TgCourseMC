@@ -131,7 +131,7 @@ def check_interview_question(question: str, answer: str) -> str:
         'answer': answer,
     }
     data = requests.get(
-        f'http://127.0.0.1:8000/api/v1/ai_check_question/',
+        f'https://coursemc.ru/api/v1/ai_check_question/',
         params=entered_data).text
     data = json.loads(data)
     return data['score']

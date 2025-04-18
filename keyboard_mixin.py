@@ -123,7 +123,7 @@ class KeyboardMixin:
         return kb
 
     @staticmethod
-    def difficulty_kb() -> types.ReplyKeyboardMarkup:
+    def difficulty_kb(symbol='-') -> types.ReplyKeyboardMarkup:
         """
         Создает основную клавиатуру твой собес.
 
@@ -131,12 +131,12 @@ class KeyboardMixin:
             types.ReplyKeyboardMarkup: Клавиатура с 6 кнопками
         """
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn1 = types.KeyboardButton('1-3')
-        btn2 = types.KeyboardButton('1-5')
-        btn3 = types.KeyboardButton('1-7')
-        btn4 = types.KeyboardButton('3-5')
-        btn5 = types.KeyboardButton('5-7')
-        btn6 = types.KeyboardButton('7-9')
+        btn1 = types.KeyboardButton(f'1{symbol}3')
+        btn2 = types.KeyboardButton(f'1{symbol}5')
+        btn3 = types.KeyboardButton(f'1{symbol}7')
+        btn4 = types.KeyboardButton(f'3{symbol}5')
+        btn5 = types.KeyboardButton(f'5{symbol}7')
+        btn6 = types.KeyboardButton(f'7{symbol}9')
         kb.row(btn1, btn2, btn3)
         kb.row(btn4, btn5, btn6)
         return kb
@@ -189,3 +189,19 @@ class KeyboardMixin:
                                           callback_data='next_ai')
         kb.row(btn1)
         return kb
+
+    @staticmethod
+    def get_question_category() -> types.InlineKeyboardMarkup:
+        """
+        Создает Reply клавиатуру для выбора категории вопросов ai собеса.
+
+        Returns:
+            types.ReplyKeyboardMarkup: Клавиатура с 1 кнопкой
+        """
+        kb = types.ReplyKeyboardMarkup()
+        btn1 = types.InlineKeyboardButton(text='Рython')
+        btn2 = types.InlineKeyboardButton(text='ООП')
+        btn3 = types.InlineKeyboardButton(text='Djangо')
+        kb.row(btn1, btn2, btn3)
+        return kb
+

@@ -281,7 +281,27 @@ def interview_question_ai_assistant_button(message):
         bot.send_message(chat_id,
                          'Вы израсходовали лимит на запросы. Попробуйте завтра!')
         return
-    question = get_interview_question()
+    bot.send_message(chat_id, f'Выберите категорию',
+                     reply_markup=kb.get_question_category())
+    bot.register_next_step_handler(message, interview_get_question)
+
+
+def interview_get_question(message):
+    chat_id = message.chat.id
+    category = message.text.replace('Р', 'P').replace('о', 'o').replace('O', 'О')
+    if category == 'Python':
+        bot.send_message(chat_id, 'Укажите сложность вопроса:',
+                         reply_markup=kb.difficulty_kb(symbol='—'))
+        bot.register_next_step_handler(message, interview_get_question)
+        return
+    level = ''
+    if '—' in category:
+        level = category
+        category = 'Python'
+    questions = get_interview_question(category, level=level.replace('—', '-'))
+    question = f'{questions[0]["title"]}'
+    if category == 'Python':
+        question += f' ({questions[0]["complexity"]})'
     keyboard = telebot.types.ReplyKeyboardRemove()
     bot.send_message(chat_id, f'Вопрос:\n{question}', reply_markup=keyboard)
     interview_question[chat_id] = question
@@ -297,6 +317,8 @@ def interview_check_ai_assistant_button(message):
     chat_id = message.chat.id
     question = interview_question[chat_id]
     answer = message.text
+    if question[-1] == ')' and question[-2].isdigit() and question[-3] == '(':
+        question = question[:-4]
 
     msg = bot.send_message(chat_id, '⚙️ Ожидание...')
     result = check_interview_question(question, answer)
@@ -322,7 +344,7 @@ def interview_check_ai_assistant_button(message):
     if message.chat.id == TG_ID_ADMIN:
         keyboard = kb.admin_kb()
 
-    bot.send_message(chat_id, text=f'Результат: {result}',
+    bot.send_message(chat_id, text=result,
                      reply_markup=keyboard)
 
 

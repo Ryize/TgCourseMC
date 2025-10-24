@@ -288,7 +288,8 @@ def interview_question_ai_assistant_button(message):
 
 def interview_get_question(message):
     chat_id = message.chat.id
-    category = message.text.replace('Р', 'P').replace('о', 'o').replace('O', 'О')
+    category = message.text.replace('Р', 'P').replace('о', 'o').replace('O',
+                                                                        'О')
     if category == 'Python':
         bot.send_message(chat_id, 'Укажите сложность вопроса:',
                          reply_markup=kb.difficulty_kb(symbol='—'))
@@ -431,8 +432,8 @@ def interview_question_amount(message):
 @bot.callback_query_handler(func=lambda call: call.data == 'next_ai')
 def next_question_ai_interview(call):
     """
-    Действия бота после нажатия кнопки '👉 Следующий вопрос'. Вызывает функцию
-    interview_question_ai_assistant_button.
+    Действия бота после нажатия кнопки '👉 Следующий вопрос'.
+    Вызывает функцию interview_question_ai_assistant_button.
     """
     message = call.message
     interview_question_ai_assistant_button(message)

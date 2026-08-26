@@ -172,6 +172,32 @@ class PendingSolutionReview(BaseModel):
         db_table = 'pending_lesson_solution_reviews'
 
 
+class TeacherInvite(BaseModel):
+    """One-time link that binds a Telegram account to a CourseMC teacher."""
+
+    token_hash = CharField(unique=True, max_length=64)
+    django_username = CharField()
+    created_by_telegram_id = BigIntegerField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+    expires_at = DateTimeField()
+    used_at = DateTimeField(null=True)
+
+    class Meta:
+        db_table = 'teacher_invites'
+
+
+class OwnerFlow(BaseModel):
+    """Persistent owner conversation state for teacher management."""
+
+    telegram_user_id = BigIntegerField(unique=True)
+    action = CharField()
+    payload = TextField(default='{}')
+    created_at = DateTimeField(default=datetime.datetime.now)
+
+    class Meta:
+        db_table = 'owner_flows'
+
+
 ALL_MODELS = [
     User,
     Application,
@@ -182,6 +208,8 @@ ALL_MODELS = [
     ProcessedSubmission,
     SolutionNotification,
     PendingSolutionReview,
+    TeacherInvite,
+    OwnerFlow,
 ]
 
 db.create_tables(ALL_MODELS)

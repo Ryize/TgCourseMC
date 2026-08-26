@@ -12,12 +12,13 @@ from admin import admin_actions
 from api_worker import authenticate_student, get_payment, get_questions, \
     get_interview_question, check_interview_question
 from billing import get_payment_url
-from config import bot
+from config import COURSEMC_OWNER_TELEGRAM_ID, bot
 from keyboard_mixin import KeyboardMixin
 from lesson_solutions import register_lesson_solution_handlers
 from models import User, Interview, current_date
+from teacher_management import register_teacher_management_handlers
 
-TG_ID_ADMIN = 814401631
+TG_ID_ADMIN = COURSEMC_OWNER_TELEGRAM_ID
 
 kb = KeyboardMixin()
 
@@ -29,6 +30,7 @@ interview_question = {}
 
 # Register the persistent review-comment handler before the catch-all handler
 # below, so a teacher's next message is consumed by the review workflow.
+teacher_management_handlers = register_teacher_management_handlers(bot)
 lesson_solution_handlers = register_lesson_solution_handlers(bot)
 
 
@@ -43,6 +45,8 @@ def welcome(message):
     если id совпало, бот выдаёт приветствие админу и его индивидуальную
     клавиатуру.
     """
+    if teacher_management_handlers.handle_start_payload(message):
+        return
     try:
         user = User.select().where(User.chat_id == message.chat.id).first()
         keyboard = kb.user_kb()

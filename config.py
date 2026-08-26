@@ -60,3 +60,7 @@ bot = telebot.TeleBot(TOKEN)
 account_id = os.getenv('SHOP_ID')
 secret_key = os.getenv('SECRET_KEY')
 YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
+COURSEMC_OWNER_TELEGRAM_ID = int(os.getenv(
+    'COURSEMC_OWNER_TELEGRAM_ID',
+    '814401631',
+))

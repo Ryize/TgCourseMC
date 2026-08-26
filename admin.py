@@ -4,11 +4,11 @@
 import datetime
 
 from api_worker import get_application, get_weekday_timetable
-from config import bot
+from config import COURSEMC_OWNER_TELEGRAM_ID, bot
 from keyboard_mixin import KeyboardMixin
 from models import User
 
-TG_ID_ADMIN = 814401631
+TG_ID_ADMIN = COURSEMC_OWNER_TELEGRAM_ID
 
 kb = KeyboardMixin()
 

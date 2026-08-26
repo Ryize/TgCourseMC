@@ -86,9 +86,10 @@ class KeyboardMixin:
         btn3 = types.KeyboardButton('Пинг ⚾')
         btn4 = types.KeyboardButton('Твой собес 👨‍💻')
         btn5 = types.KeyboardButton('Расписание 📆')
+        btn6 = types.KeyboardButton('Преподаватели 👨‍🏫')
         kb.row(btn1, btn3)
         kb.row(btn2, btn4)
-        kb.row(btn5)
+        kb.row(btn5, btn6)
         return kb
 
     @staticmethod
@@ -204,4 +205,3 @@ class KeyboardMixin:
         btn3 = types.InlineKeyboardButton(text='Djangо')
         kb.row(btn1, btn2, btn3)
         return kb
-

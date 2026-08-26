@@ -9,11 +9,12 @@ import requests
 import telebot
 
 from admin import admin_actions
-from api_worker import get_student, get_payment, get_questions, \
+from api_worker import authenticate_student, get_payment, get_questions, \
     get_interview_question, check_interview_question
 from billing import get_payment_url
 from config import bot
 from keyboard_mixin import KeyboardMixin
+from lesson_solutions import register_lesson_solution_handlers
 from models import User, Interview, current_date
 
 TG_ID_ADMIN = 814401631
@@ -25,6 +26,10 @@ interview_data = {}
 pay_data = {}
 number_of_passes = {}
 interview_question = {}
+
+# Register the persistent review-comment handler before the catch-all handler
+# below, so a teacher's next message is consumed by the review workflow.
+lesson_solution_handlers = register_lesson_solution_handlers(bot)
 
 
 @bot.message_handler(commands=['start'])
@@ -90,34 +95,37 @@ def check_autorization(message):
     при совпадении выдает клавиатуру действий пользователя,
     при не совпадении - сообщение с ошибкой.
     """
-    temp_data[message.chat.id]['password'] = message.text
-    for i in get_student():
-        if (
-                i['name'] == temp_data[message.chat.id]['login']
-                and i['password'] == temp_data[message.chat.id]['password']
-        ):
-            user = User(
-                chat_id=message.chat.id,
-                name=temp_data[message.chat.id]['login']
-            )
+    credentials = temp_data.pop(message.chat.id, {})
+    login_value = credentials.get('login', '')
+    try:
+        auth_result = authenticate_student(login_value, message.text)
+    except (requests.RequestException, RuntimeError, ValueError):
+        bot.send_message(
+            message.chat.id,
+            'Сервис авторизации временно недоступен. Попробуйте ещё раз.',
+        )
+        login(message)
+        return
 
-            user.save()
-            if message.chat.id == TG_ID_ADMIN:
-                admin_actions(message, user)
-            else:
-                bot.send_message(
-                    message.chat.id,
-                    f'Привет, {temp_data[message.chat.id]["login"]}!',
-                    reply_markup=kb.user_kb(),
-                )
-                temp_data[message.chat.id] = {}
-            break
-    else:
+    if not auth_result.get('authenticated'):
         bot.send_message(
             message.chat.id,
             'Неправильно введены данные!',
         )
         login(message)
+        return
+
+    username = auth_result['username']
+    user = User(chat_id=message.chat.id, name=username)
+    user.save()
+    if message.chat.id == TG_ID_ADMIN:
+        admin_actions(message, user)
+    else:
+        bot.send_message(
+            message.chat.id,
+            f'Привет, {username}!',
+            reply_markup=kb.user_kb(),
+        )
 
 
 @bot.message_handler(func=lambda message: message.text == 'Пинг ⚾')

@@ -3,22 +3,50 @@
 """
 
 import json
+import os
 
 import requests
 
-from config import STUDENT_API, PAYMENT_API, APPLICATION_API, REVIEW_API
+from config import PAYMENT_API, APPLICATION_API, REVIEW_API
 
 
-def get_student() -> dict:
-    """
-    Получает данные о студентах из API.
+COURSEMC_API_BASE_URL = os.getenv(
+    'COURSEMC_API_BASE_URL',
+    'https://coursemc.ru/api/v1',
+).rstrip('/')
+COURSEMC_BOT_API_TOKEN = os.getenv('COURSEMC_BOT_API_TOKEN', '')
 
-    Returns:
-        dict: Данные студентов в виде словаря.
-    """
-    data_no_json = requests.get(STUDENT_API, timeout=5).text
-    data = json.loads(data_no_json)
-    return data
+
+def _bot_headers() -> dict:
+    """Не позволяет случайно обратиться к закрытому API без секрета."""
+    if not COURSEMC_BOT_API_TOKEN:
+        raise RuntimeError('Не задан COURSEMC_BOT_API_TOKEN')
+    return {'X-CourseMC-Bot-Token': COURSEMC_BOT_API_TOKEN}
+
+
+def authenticate_student(login: str, password: str) -> dict:
+    """Проверяет ученика на сайте, не загружая логины и пароли остальных."""
+    response = requests.post(
+        f'{COURSEMC_API_BASE_URL}/bot/authenticate/',
+        json={'login': login, 'password': password},
+        headers=_bot_headers(),
+        timeout=5,
+    )
+    if response.status_code == 401:
+        return {'authenticated': False}
+    response.raise_for_status()
+    return response.json()
+
+
+def get_group_student_usernames(group_id: int) -> list:
+    """Возвращает канонические логины действующих учеников группы."""
+    response = requests.get(
+        f'{COURSEMC_API_BASE_URL}/bot/groups/{group_id}/students/',
+        headers=_bot_headers(),
+        timeout=5,
+    )
+    response.raise_for_status()
+    return response.json().get('usernames', [])
 
 
 def get_payment(username) -> dict:

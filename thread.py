@@ -39,7 +39,8 @@ import time
 import requests
 
 from admin import send_admin_timetable, get_weekday
-from api_worker import get_application, get_review, get_weekday_timetable
+from api_worker import (get_application, get_group_student_usernames,
+                        get_review, get_weekday_timetable)
 from billing import check_payment
 from bot import TG_ID_ADMIN, bot, pay_data
 from config import YANDEX_TOKEN
@@ -230,12 +231,17 @@ def send_lesson_link_to_group() -> None:
 
         bot.send_message(TG_ID_ADMIN, f'👉 Ссылка на урок: {lesson_url}')
 
-        for student in json.loads(
-                requests.get('https://coursemc.ru/api/v1/student/').text
-        ):
-            if student['groups'] == group_id:
-                user = User.select().where(
-                    User.name == student['name']).first()
-                if user:
-                    bot.send_message(int(user.chat_id), f'👉 Ссылка на урок: {lesson_url}')
+        try:
+            usernames = get_group_student_usernames(group_id)
+        except (requests.RequestException, RuntimeError, ValueError):
+            time.sleep(60)
+            continue
+
+        for username in usernames:
+            user = User.select().where(User.name == username).first()
+            if user:
+                bot.send_message(
+                    int(user.chat_id),
+                    f'👉 Ссылка на урок: {lesson_url}',
+                )
         time.sleep(900)

@@ -31,12 +31,32 @@ Telegram-бота с помощью библиотеки telebot. Он вклю�
 import os
 
 import telebot
+from telebot import apihelper
 
-STUDENT_API = os.getenv('STUDENT_API')
-PAYMENT_API = os.getenv('PAYMENT_API')
-APPLICATION_API = os.getenv('APPLICATION_API')
-REVIEW_API = os.getenv('REVIEW_API')
+STUDENT_API = os.getenv(
+    'STUDENT_API',
+    'https://coursemc.ru/api/v1/student/',
+)
+PAYMENT_API = os.getenv(
+    'PAYMENT_API',
+    'https://coursemc.ru/api/v1/payment/',
+)
+APPLICATION_API = os.getenv(
+    'APPLICATION_API',
+    'https://coursemc.ru/api/v1/app_training/',
+)
+REVIEW_API = os.getenv(
+    'REVIEW_API',
+    'https://coursemc.ru/api/v1/project_for_review/',
+)
 TOKEN = os.getenv('TOKEN')
+TELEGRAM_PROXY_URL = os.getenv('TELEGRAM_PROXY_URL')
+if TELEGRAM_PROXY_URL:
+    apihelper.proxy = {
+        'http': TELEGRAM_PROXY_URL,
+        'https': TELEGRAM_PROXY_URL,
+    }
 bot = telebot.TeleBot(TOKEN)
-account_id = os.environ.get('SHOP_ID')
-secret_key = os.environ.get('SECRET_KEY')
+account_id = os.getenv('SHOP_ID')
+secret_key = os.getenv('SECRET_KEY')
+YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')

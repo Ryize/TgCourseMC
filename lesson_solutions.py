@@ -19,6 +19,7 @@ from coursemc_client import (
     client_from_environment,
 )
 from models import (
+    AIReviewTracking,
     BotState,
     PendingSolutionReview,
     ProcessedSubmission,
@@ -29,6 +30,7 @@ from models import (
 
 logger = logging.getLogger(__name__)
 POLL_LIMIT = 50
+MAX_AI_REVIEW_TEXT = 2500
 _service: 'LessonSolutionService | None' = None
 
 
@@ -183,6 +185,18 @@ class LessonSolutionStore:
             PendingSolutionReview.teacher == teacher
         )
 
+    @staticmethod
+    def pending_ai_reviews(teacher: TeacherIdentity) -> list[AIReviewTracking]:
+        query = (
+            AIReviewTracking.select()
+            .join(SolutionNotification)
+            .where(
+                (SolutionNotification.teacher == teacher)
+                & (AIReviewTracking.status == 'pending')
+            )
+        )
+        return list(query)
+
 
 class LessonSolutionService:
     def __init__(
@@ -197,11 +211,26 @@ class LessonSolutionService:
 
     def poll_once(self) -> int:
         delivered = 0
+        pending_ai_reviews: list[AIReviewTracking] = []
         for teacher in self.store.active_teachers():
-            delivered += self.poll_teacher(teacher)
+            count, pending = self._poll_teacher_queue(teacher)
+            delivered += count
+            pending_ai_reviews.extend(pending)
+        # Every teacher's new work is delivered before potentially slow
+        # detail requests for recommendations already in progress.
+        self._refresh_pending_ai_reviews(pending_ai_reviews)
         return delivered
 
     def poll_teacher(self, teacher: TeacherIdentity) -> int:
+        delivered, pending_ai_reviews = self._poll_teacher_queue(teacher)
+        self._refresh_pending_ai_reviews(pending_ai_reviews)
+        return delivered
+
+    def _poll_teacher_queue(
+        self,
+        teacher: TeacherIdentity,
+    ) -> tuple[int, list[AIReviewTracking]]:
+        pending_ai_reviews = self.store.pending_ai_reviews(teacher)
         cursor = self.store.cursor(teacher)
         page = self.client.get_solutions(
             cursor,
@@ -217,7 +246,111 @@ class LessonSolutionService:
 
         next_cursor = int(page.get('next_cursor', cursor))
         self.store.save_cursor(teacher, next_cursor)
-        return len(results)
+        return len(results), pending_ai_reviews
+
+    def _refresh_pending_ai_reviews(
+        self,
+        pending_ai_reviews: list[AIReviewTracking],
+    ) -> None:
+        for tracking in pending_ai_reviews:
+            tracking = AIReviewTracking.get_by_id(tracking.id)
+            if tracking.status != 'pending':
+                continue
+            notification = tracking.notification
+            try:
+                solution = self.client.get_solution(notification.solution_id)
+            except CourseMCAPIError as exc:
+                # A bot deployed before the detail endpoint exists must keep
+                # working with the old queue API and must not retry forever.
+                if exc.status_code == 404:
+                    self._complete_ai_review(
+                        tracking,
+                        notification,
+                        'detail_unavailable',
+                        self._ai_review_text({'status': 'unsupported'}),
+                    )
+                else:
+                    logger.warning(
+                        'Could not refresh CourseMC AI review: HTTP %s',
+                        exc.status_code,
+                    )
+                continue
+            except requests.RequestException as exc:
+                logger.warning(
+                    'Could not refresh CourseMC AI review: %s',
+                    type(exc).__name__,
+                )
+                continue
+
+            if int(solution.get('submission_id') or 0) != tracking.submission_id:
+                # The solution id stays the same between attempts. Never put a
+                # newer attempt's review into this older Telegram message.
+                tracking.status = 'stale'
+                tracking.last_checked_at = dt.datetime.now()
+                tracking.save()
+                continue
+
+            if 'ai_review' not in solution:
+                self._complete_ai_review(
+                    tracking,
+                    notification,
+                    'detail_unavailable',
+                    self._ai_review_text({'status': 'unsupported'}),
+                )
+                continue
+
+            ai_review = solution.get('ai_review')
+            status = self._ai_review_status(ai_review)
+            if status == 'pending':
+                tracking.last_checked_at = dt.datetime.now()
+                tracking.save(only=(AIReviewTracking.last_checked_at,))
+                continue
+
+            self._complete_ai_review(
+                tracking,
+                notification,
+                status,
+                self._ai_review_text(ai_review),
+            )
+
+    def _complete_ai_review(
+        self,
+        tracking: AIReviewTracking,
+        notification: SolutionNotification,
+        status: str,
+        rendered_text: str,
+    ) -> None:
+        # A callback may have reviewed the work while the detail request was
+        # in flight. Use its latest persisted status for the message and keys.
+        notification = SolutionNotification.get_by_id(notification.id)
+        message_text = self._notification_display_text(
+            notification,
+            rendered_text,
+        )
+        try:
+            self.bot.edit_message_text(
+                message_text,
+                chat_id=notification.chat_id,
+                message_id=notification.message_id,
+                reply_markup=(
+                    self.review_keyboard(notification.id)
+                    if notification.status == 'pending' else None
+                ),
+            )
+        except Exception as exc:
+            # A successful Telegram edit followed by a process crash can
+            # leave our DB in "pending". Telegram reports that retry as a
+            # no-op; in that case the desired message is already visible.
+            if 'message is not modified' not in str(exc).lower():
+                logger.warning(
+                    'Could not update CourseMC AI review message: %s',
+                    type(exc).__name__,
+                )
+                return
+        tracking.status = status
+        tracking.rendered_text = rendered_text
+        tracking.last_checked_at = dt.datetime.now()
+        tracking.save()
 
     def _deliver_submission(
         self,
@@ -226,11 +359,15 @@ class LessonSolutionService:
     ) -> None:
         submission_id = int(solution['submission_id'])
         notification = self.store.notification(teacher, submission_id)
+        if notification is not None and notification.status != 'pending':
+            self.store.mark_processed(teacher, submission_id)
+            return
+        is_new_notification = notification is None
         if notification is None:
             message_text = self._notification_text(solution)
             sent = self.bot.send_message(
                 teacher.telegram_user_id,
-                message_text,
+                message_text + self._ai_review_text(solution.get('ai_review')),
                 reply_markup=self._review_keyboard_placeholder(),
             )
             notification = SolutionNotification.create(
@@ -253,6 +390,13 @@ class LessonSolutionService:
                 message_id=notification.message_id,
                 reply_markup=self.review_keyboard(notification.id),
             )
+
+        self._supersede_older_notifications(teacher, notification)
+        self._track_ai_review(
+            notification,
+            solution,
+            was_already_sent=not is_new_notification,
+        )
 
         files = solution.get('files') or []
         remaining_files = files[notification.files_sent:]
@@ -280,6 +424,42 @@ class LessonSolutionService:
         notification.save()
         self.store.mark_processed(teacher, submission_id)
 
+    def _supersede_older_notifications(
+        self,
+        teacher: TeacherIdentity,
+        current: SolutionNotification,
+    ) -> None:
+        older = SolutionNotification.select().where(
+            (SolutionNotification.teacher == teacher)
+            & (SolutionNotification.solution_id == current.solution_id)
+            & (SolutionNotification.submission_id < current.submission_id)
+            & (SolutionNotification.status == 'pending')
+        )
+        for notification in older:
+            self._mark_superseded(notification)
+
+    def _mark_superseded(self, notification: SolutionNotification) -> None:
+        notification.status = 'superseded'
+        notification.save(only=(SolutionNotification.status,))
+        tracking = AIReviewTracking.get_or_none(
+            AIReviewTracking.notification == notification
+        )
+        if tracking and tracking.status == 'pending':
+            tracking.status = 'stale'
+            tracking.rendered_text = ''
+            tracking.save(only=(
+                AIReviewTracking.status,
+                AIReviewTracking.rendered_text,
+            ))
+        self._finish_pending_review(notification)
+        try:
+            self._edit_reviewed_notification(notification)
+        except Exception as exc:
+            logger.warning(
+                'Could not mark old solution notification as superseded: %s',
+                type(exc).__name__,
+            )
+
     @staticmethod
     def _notification_text(solution: dict[str, Any]) -> str:
         student = solution.get('student') or {}
@@ -300,6 +480,102 @@ class LessonSolutionService:
             f'Попытка: {solution.get("attempt_number", "—")}\n'
             f'Отправлено: {format_course_date(solution.get("submitted_at"))}'
         )
+
+    def _track_ai_review(
+        self,
+        notification: SolutionNotification,
+        solution: dict[str, Any],
+        *,
+        was_already_sent: bool,
+    ) -> None:
+        # Older CourseMC deployments omit this field entirely. Treat it as a
+        # normal solution notification rather than as a failed AI check.
+        if 'ai_review' not in solution:
+            return
+        if AIReviewTracking.get_or_none(
+            AIReviewTracking.notification == notification
+        ):
+            return
+        ai_review = solution.get('ai_review')
+        status = self._ai_review_status(ai_review)
+        rendered_text = self._ai_review_text(ai_review)
+        tracking = AIReviewTracking.create(
+            notification=notification,
+            submission_id=notification.submission_id,
+            status='pending' if was_already_sent else status,
+            rendered_text='' if was_already_sent else rendered_text,
+        )
+        if was_already_sent and status != 'pending':
+            self._complete_ai_review(
+                tracking,
+                notification,
+                status,
+                rendered_text,
+            )
+
+    @staticmethod
+    def _ai_review_status(ai_review: Any) -> str:
+        if not isinstance(ai_review, dict):
+            return 'not_requested'
+        return str(ai_review.get('status') or 'not_requested')
+
+    @classmethod
+    def _ai_review_text(cls, ai_review: Any) -> str:
+        if not isinstance(ai_review, dict):
+            return ''
+
+        status = cls._ai_review_status(ai_review)
+        feedback = ai_review.get('feedback')
+        source_summary = ai_review.get('source_summary')
+        issue_count = ai_review.get('issue_count')
+        error = ai_review.get('error')
+        lines: list[str] = []
+
+        if status == 'pending':
+            lines = [
+                '🤖 Предварительная рекомендация ИИ',
+                'Рекомендация готовится. Уведомление обновится автоматически.',
+            ]
+        elif status == 'partial':
+            lines = [
+                '🤖 Предварительная рекомендация ИИ — проверка неполная.',
+                'Нужна ручная проверка всех файлов.',
+            ]
+        elif status in {'failed', 'unsupported'}:
+            lines = [
+                '🤖 ИИ-рекомендация недоступна.',
+                'Требуется ручная проверка преподавателем.',
+            ]
+        elif status == 'ready':
+            lines = [
+                '🤖 Предварительная рекомендация ИИ',
+                'Проверьте её перед тем, как принять решение.',
+            ]
+        elif status == 'not_requested':
+            lines = ['🤖 ИИ-рекомендация для этой работы не запрошена.']
+        else:
+            lines = ['🤖 Статус ИИ-рекомендации неизвестен.']
+
+        if feedback is not None:
+            lines.extend(('', str(feedback)))
+        elif status in {'ready', 'partial'}:
+            lines.extend((
+                '',
+                'ИИ не вернул текст рекомендации. Это не означает, '
+                'что в работе нет ошибок.',
+            ))
+        if status in {'ready', 'partial'} and feedback and issue_count is not None:
+            lines.append(f'Существенных замечаний: {issue_count}')
+        if source_summary and status in {'ready', 'partial', 'unsupported', 'failed'}:
+            lines.append(str(source_summary))
+        if error and status in {'failed', 'unsupported'}:
+            lines.append(f'Причина: {error}')
+        text = '\n\n' + '\n'.join(lines)
+        if len(text) > MAX_AI_REVIEW_TEXT:
+            text = text[:MAX_AI_REVIEW_TEXT - 40].rstrip() + (
+                '\n… Рекомендация сокращена для Telegram.'
+            )
+        return text
 
     @staticmethod
     def _review_keyboard_placeholder() -> types.InlineKeyboardMarkup:
@@ -345,7 +621,8 @@ class LessonSolutionService:
         )
         if notification.status != 'pending':
             self._edit_reviewed_notification(notification)
-            return 'Решение уже проверено.'
+            return self._non_pending_message(notification)
+        self._ensure_current_submission(notification)
         result = self.client.review_solution(
             notification.solution_id,
             teacher.django_username,
@@ -368,7 +645,8 @@ class LessonSolutionService:
         )
         if notification.status != 'pending':
             self._edit_reviewed_notification(notification)
-            raise AlreadyReviewedError('Решение уже проверено.')
+            raise AlreadyReviewedError(self._non_pending_message(notification))
+        self._ensure_current_submission(notification)
         pending = self.store.pending_for_teacher(teacher)
         if pending is None:
             pending = PendingSolutionReview.create(
@@ -423,6 +701,10 @@ class LessonSolutionService:
             raise ValueError('Комментарий не может быть пустым')
 
         notification = pending.notification
+        if notification.status != 'pending':
+            self._finish_pending_review(notification)
+            raise StaleSubmissionError(self._non_pending_message(notification))
+        self._ensure_current_submission(notification)
         result = self.client.review_solution(
             notification.solution_id,
             teacher.django_username,
@@ -438,6 +720,30 @@ class LessonSolutionService:
         self._finish_pending_review(notification)
         self._edit_reviewed_notification(notification)
         return 'Решение возвращено на доработку.'
+
+    def _ensure_current_submission(
+        self,
+        notification: SolutionNotification,
+    ) -> None:
+        try:
+            current = self.client.get_solution(notification.solution_id)
+        except CourseMCAPIError as exc:
+            if exc.status_code == 404:
+                # Compatibility with CourseMC before the detail endpoint.
+                return
+            raise
+        if int(current.get('submission_id') or 0) == notification.submission_id:
+            return
+        self._mark_superseded(notification)
+        raise StaleSubmissionError(
+            'Ученик отправил новую попытку. Проверьте новое уведомление.'
+        )
+
+    @staticmethod
+    def _non_pending_message(notification: SolutionNotification) -> str:
+        if notification.status == 'superseded':
+            return 'Ученик отправил новую попытку. Проверьте новое уведомление.'
+        return 'Решение уже проверено.'
 
     def _authorized_notification(
         self,
@@ -498,11 +804,39 @@ class LessonSolutionService:
         self,
         notification: SolutionNotification,
     ) -> None:
-        if notification.status == 'accepted':
-            status_text = '✅ Принято'
-        else:
-            status_text = '🛠 Нужна доработка'
-        details = [notification.message_text, '', status_text]
+        ai_review = AIReviewTracking.get_or_none(
+            AIReviewTracking.notification == notification
+        )
+        self.bot.edit_message_text(
+            self._notification_display_text(
+                notification,
+                ai_review.rendered_text if ai_review else '',
+            ),
+            chat_id=notification.chat_id,
+            message_id=notification.message_id,
+            reply_markup=None,
+        )
+
+    @staticmethod
+    def _notification_display_text(
+        notification: SolutionNotification,
+        ai_review_text: str,
+    ) -> str:
+        details = [notification.message_text + ai_review_text]
+        if notification.status == 'pending':
+            return details[0]
+        if notification.status == 'superseded':
+            return '\n'.join((
+                details[0],
+                '',
+                '↪️ Отправлена новая попытка. Проверьте новое уведомление.',
+            ))
+        status_text = (
+            '✅ Принято'
+            if notification.status == 'accepted'
+            else '🛠 Нужна доработка'
+        )
+        details.extend(('', status_text))
         if notification.reviewer_username:
             details.append(f'Проверил: {notification.reviewer_username}')
         if notification.reviewed_at:
@@ -510,15 +844,14 @@ class LessonSolutionService:
             details.append(f'Проверено: {reviewed}')
         if notification.teacher_comment:
             details.append(f'Комментарий: {notification.teacher_comment}')
-        self.bot.edit_message_text(
-            '\n'.join(details),
-            chat_id=notification.chat_id,
-            message_id=notification.message_id,
-            reply_markup=None,
-        )
+        return '\n'.join(details)
 
 
 class AlreadyReviewedError(Exception):
+    pass
+
+
+class StaleSubmissionError(Exception):
     pass
 
 
@@ -550,6 +883,8 @@ class LessonSolutionHandlers:
                 message.chat.id,
                 'Комментарий не может быть пустым.',
             )
+        except StaleSubmissionError as exc:
+            self.bot.send_message(message.chat.id, str(exc))
         except CourseMCAPIError as exc:
             self._send_api_error(message.chat.id, exc)
         except requests.RequestException:
@@ -596,6 +931,8 @@ class LessonSolutionHandlers:
             else:
                 result = 'Кнопка устарела.'
         except AlreadyReviewedError as exc:
+            result = str(exc)
+        except StaleSubmissionError as exc:
             result = str(exc)
         except PermissionError:
             result = 'У вас нет доступа к этому решению.'

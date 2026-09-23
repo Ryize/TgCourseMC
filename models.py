@@ -172,6 +172,23 @@ class PendingSolutionReview(BaseModel):
         db_table = 'pending_lesson_solution_reviews'
 
 
+class AIReviewTracking(BaseModel):
+    """Stored AI-review state for updating an already sent notification."""
+
+    notification = ForeignKeyField(
+        SolutionNotification,
+        unique=True,
+        on_delete='CASCADE',
+    )
+    submission_id = BigIntegerField()
+    status = CharField(default='pending')
+    rendered_text = TextField(default='')
+    last_checked_at = DateTimeField(null=True)
+
+    class Meta:
+        db_table = 'lesson_solution_ai_reviews'
+
+
 class TeacherInvite(BaseModel):
     """One-time link that binds a Telegram account to a CourseMC teacher."""
 
@@ -208,6 +225,7 @@ ALL_MODELS = [
     ProcessedSubmission,
     SolutionNotification,
     PendingSolutionReview,
+    AIReviewTracking,
     TeacherInvite,
     OwnerFlow,
 ]

@@ -122,6 +122,14 @@ class CourseMCClient:
         )
         return self._json(response)
 
+    def get_solution(self, solution_id: int) -> dict[str, Any]:
+        """Return one current solution, including a later AI recommendation."""
+        response = self.session.get(
+            f'{self.base_url}/bot/lesson-solutions/{solution_id}/',
+            timeout=self.timeout,
+        )
+        return self._json(response)
+
     def download_file(self, file_info: dict[str, Any]) -> io.BytesIO:
         declared_size = int(file_info.get('size') or 0)
         if declared_size > self.max_file_size:

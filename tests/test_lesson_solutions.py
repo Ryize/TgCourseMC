@@ -6,8 +6,13 @@ import requests
 from peewee import SqliteDatabase
 
 from coursemc_client import CourseMCAPIError, CourseMCClient
-from lesson_solutions import LessonSolutionHandlers, LessonSolutionService
+from lesson_solutions import (
+    LessonSolutionHandlers,
+    LessonSolutionService,
+    StaleSubmissionError,
+)
 from models import (
+    AIReviewTracking,
     ALL_MODELS,
     BotState,
     PendingSolutionReview,
@@ -25,6 +30,8 @@ class FakeBot:
         self.edited_texts = []
         self.edited_markups = []
         self.callback_answers = []
+        self.edit_text_error = None
+        self.edit_markup_error = None
 
     def send_message(self, chat_id, text, reply_markup=None):
         message = pytypes.SimpleNamespace(message_id=self.next_message_id)
@@ -37,9 +44,13 @@ class FakeBot:
         return pytypes.SimpleNamespace(message_id=self.next_message_id)
 
     def edit_message_reply_markup(self, **kwargs):
+        if self.edit_markup_error:
+            raise self.edit_markup_error
         self.edited_markups.append(kwargs)
 
     def edit_message_text(self, text, **kwargs):
+        if self.edit_text_error:
+            raise self.edit_text_error
         self.edited_texts.append((text, kwargs))
 
     def answer_callback_query(self, callback_id, text, show_alert=False):
@@ -47,9 +58,11 @@ class FakeBot:
 
 
 class FakeClient:
-    def __init__(self, pages=None):
+    def __init__(self, pages=None, details=None):
         self.pages = list(pages or [])
+        self.details = list(details or [])
         self.get_calls = []
+        self.detail_calls = []
         self.download_calls = []
         self.review_calls = []
         self.review_error = None
@@ -60,6 +73,18 @@ class FakeClient:
         if isinstance(page, Exception):
             raise page
         return page
+
+    def get_solution(self, solution_id):
+        self.detail_calls.append(solution_id)
+        detail = (
+            self.details.pop(0)
+            if self.details else CourseMCAPIError(404, 'old API')
+        )
+        if callable(detail):
+            detail = detail()
+        if isinstance(detail, Exception):
+            raise detail
+        return detail
 
     def download_file(self, file_info):
         self.download_calls.append(file_info['id'])
@@ -88,8 +113,11 @@ class FakeClient:
         }
 
 
-def solution(submission_id=127, files=1, attempt=1):
-    return {
+MISSING = object()
+
+
+def solution(submission_id=127, files=1, attempt=1, ai_review=MISSING):
+    result = {
         'id': 42,
         'submission_id': submission_id,
         'attempt_number': attempt,
@@ -111,6 +139,23 @@ def solution(submission_id=127, files=1, attempt=1):
             for index in range(1, files + 1)
         ],
     }
+    if ai_review is not MISSING:
+        result['ai_review'] = ai_review
+    return result
+
+
+def review(status, feedback='Проверьте обработку пустого списка.', **extra):
+    result = {
+        'status': status,
+        'status_display': status,
+        'feedback': feedback,
+        'issue_count': 1,
+        'source_summary': 'Проверены: solution.py.',
+        'error': None,
+        'reviewed_at': '2026-08-24T12:31:00+03:00',
+    }
+    result.update(extra)
+    return result
 
 
 def page(*solutions, cursor=None):
@@ -145,8 +190,8 @@ class LessonSolutionServiceTests(unittest.TestCase):
         )
         self.bot = FakeBot()
 
-    def make_service(self, pages):
-        client = FakeClient(pages)
+    def make_service(self, pages, details=None):
+        client = FakeClient(pages, details)
         return LessonSolutionService(self.bot, client), client
 
     def deliver(self, files=1):
@@ -192,6 +237,334 @@ class LessonSolutionServiceTests(unittest.TestCase):
         self.assertEqual(SolutionNotification.select().count(), 2)
         self.assertEqual(ProcessedSubmission.select().count(), 2)
         self.assertIn('Попытка: 2', self.bot.messages[1][1])
+
+    def test_ready_ai_review_is_shown_only_in_teacher_notification(self):
+        service, client = self.make_service([
+            page(solution(ai_review=review('ready'))),
+        ])
+
+        service.poll_once()
+
+        message = self.bot.messages[0][1]
+        self.assertIn('Предварительная рекомендация ИИ', message)
+        self.assertIn('Проверьте обработку пустого списка.', message)
+        self.assertEqual(client.detail_calls, [])
+        self.assertEqual(AIReviewTracking.get().status, 'ready')
+
+    def test_ready_review_without_feedback_does_not_mean_no_errors(self):
+        service, _ = self.make_service([
+            page(solution(ai_review=review(
+                'ready',
+                feedback=None,
+                issue_count=0,
+            ))),
+        ])
+
+        service.poll_once()
+
+        message = self.bot.messages[0][1]
+        self.assertIn('Это не означает, что в работе нет ошибок.', message)
+        self.assertNotIn('явных ошибок не найдено', message)
+        self.assertNotIn('Существенных замечаний: 0', message)
+
+    def test_pending_ai_review_updates_existing_message_after_cursor_is_saved(self):
+        pending = solution(ai_review=review('pending', feedback=None))
+        ready = solution(ai_review=review('ready'))
+        service, client = self.make_service(
+            [page(pending), page(cursor=127)],
+            [ready],
+        )
+
+        service.poll_once()
+
+        self.assertEqual(BotState.get().value, '127')
+        self.assertEqual(len(self.bot.messages), 1)
+        self.assertIn('Рекомендация готовится', self.bot.messages[0][1])
+        self.assertNotIn('Существенных замечаний:', self.bot.messages[0][1])
+        self.assertFalse(self.bot.edited_texts)
+
+        service.poll_once()
+
+        self.assertEqual(client.detail_calls, [42])
+        self.assertEqual(len(self.bot.messages), 1)
+        self.assertEqual(len(self.bot.documents), 1)
+        self.assertIn(
+            'Проверьте обработку пустого списка.',
+            self.bot.edited_texts[-1][0],
+        )
+        self.assertEqual(AIReviewTracking.get().status, 'ready')
+
+    def test_failed_telegram_edit_retries_without_losing_ai_recommendation(self):
+        pending = solution(ai_review=review('pending', feedback=None))
+        ready = solution(ai_review=review('ready'))
+        service, client = self.make_service(
+            [page(pending), page(cursor=127), page(cursor=127)],
+            [ready, ready],
+        )
+        service.poll_once()
+        self.bot.edit_text_error = RuntimeError('Telegram temporarily failed')
+
+        service.poll_once()
+
+        self.assertEqual(BotState.get().value, '127')
+        self.assertEqual(AIReviewTracking.get().status, 'pending')
+        self.assertFalse(self.bot.edited_texts)
+
+        self.bot.edit_text_error = None
+        service.poll_once()
+
+        self.assertEqual(client.detail_calls, [42, 42])
+        self.assertEqual(AIReviewTracking.get().status, 'ready')
+        self.assertIn('Проверьте обработку', self.bot.edited_texts[-1][0])
+        self.assertEqual(len(self.bot.messages), 1)
+
+    def test_interrupted_first_delivery_updates_existing_message_on_retry(self):
+        pending = solution(ai_review=review('pending', feedback=None))
+        ready = solution(ai_review=review('ready'))
+        service, _ = self.make_service([page(pending), page(ready)])
+        self.bot.edit_markup_error = RuntimeError('Telegram temporarily failed')
+
+        with self.assertRaises(RuntimeError):
+            service.poll_once()
+
+        self.assertEqual(len(self.bot.messages), 1)
+        self.assertFalse(BotState.select().exists())
+        self.assertFalse(AIReviewTracking.select().exists())
+        self.bot.edit_markup_error = None
+
+        service.poll_once()
+
+        self.assertEqual(BotState.get().value, '127')
+        self.assertEqual(len(self.bot.messages), 1)
+        self.assertEqual(len(self.bot.documents), 1)
+        self.assertIn('Проверьте обработку', self.bot.edited_texts[-1][0])
+        self.assertEqual(AIReviewTracking.get().status, 'ready')
+
+    def test_detail_refresh_runs_after_saving_new_queue_cursor(self):
+        pending = solution(ai_review=review('pending', feedback=None))
+        seen_cursors = []
+
+        def detail():
+            seen_cursors.append(BotState.get().value)
+            return solution(ai_review=review('ready'))
+
+        service, _ = self.make_service(
+            [page(pending), page(cursor=128)],
+            [detail],
+        )
+        service.poll_once()
+        service.poll_once()
+
+        self.assertEqual(seen_cursors, ['128'])
+
+    def test_all_teachers_receive_new_work_before_ai_detail_refresh(self):
+        TeacherIdentity.create(
+            telegram_user_id=2002,
+            django_username='second_teacher',
+        )
+        pending = solution(ai_review=review('pending', feedback=None))
+        second_teacher_work = solution(submission_id=200)
+        seen_states = []
+
+        def detail():
+            seen_states.append((
+                BotState.get(
+                    BotState.key == 'lesson-solutions-cursor:second_teacher'
+                ).value,
+                len(self.bot.messages),
+            ))
+            return solution(ai_review=review('ready'))
+
+        service, _ = self.make_service(
+            [
+                page(pending),
+                page(cursor=0),
+                page(cursor=127),
+                page(second_teacher_work),
+            ],
+            [detail],
+        )
+        service.poll_once()
+        service.poll_once()
+
+        self.assertEqual(seen_states, [('200', 2)])
+
+    def test_ai_update_preserves_a_completed_teacher_review(self):
+        pending = solution(ai_review=review('pending', feedback=None))
+        ready = solution(ai_review=review('ready'))
+        service, client = self.make_service(
+            [page(pending), page(cursor=127)],
+            [ready, ready],
+        )
+        service.poll_once()
+        notification = SolutionNotification.get()
+        service.accept(1001, notification.id)
+
+        service.poll_once()
+
+        self.assertEqual(len(client.review_calls), 1)
+        self.assertIn('Проверьте обработку', self.bot.edited_texts[-1][0])
+        self.assertIn('✅ Принято', self.bot.edited_texts[-1][0])
+        self.assertIsNone(self.bot.edited_texts[-1][1]['reply_markup'])
+        self.assertEqual(AIReviewTracking.get().status, 'ready')
+
+    def test_partial_ai_review_clearly_requires_manual_check(self):
+        partial = review(
+            'partial',
+            feedback=None,
+            source_summary='Проверены: solution.py. Не проверен report.pdf.',
+        )
+        service, _ = self.make_service([
+            page(solution(ai_review=partial)),
+        ])
+
+        service.poll_once()
+
+        message = self.bot.messages[0][1]
+        self.assertIn('проверка неполная', message)
+        self.assertIn('Нужна ручная проверка всех файлов.', message)
+        self.assertIn('Не проверен report.pdf.', message)
+        self.assertIn('Это не означает, что в работе нет ошибок.', message)
+
+    def test_failed_or_unsupported_ai_review_requires_manual_check(self):
+        for status in ('failed', 'unsupported'):
+            with self.subTest(status=status):
+                self.setUp()
+                service, _ = self.make_service([
+                    page(solution(ai_review=review(
+                        status,
+                        feedback=None,
+                        error='Сервис временно недоступен.',
+                    ))),
+                ])
+
+                service.poll_once()
+
+                message = self.bot.messages[0][1]
+                self.assertIn('ИИ-рекомендация недоступна.', message)
+                self.assertIn('Требуется ручная проверка', message)
+                self.assertIn('Сервис временно недоступен.', message)
+
+    def test_newer_submission_never_updates_an_old_notification(self):
+        first = solution(
+            submission_id=127,
+            attempt=1,
+            ai_review=review('pending', feedback=None),
+        )
+        second = solution(
+            submission_id=128,
+            attempt=2,
+            ai_review=review('pending', feedback=None),
+        )
+        detail_for_new_attempt = solution(
+            submission_id=128,
+            attempt=2,
+            ai_review=review('ready', 'Это новая попытка.'),
+        )
+        service, client = self.make_service(
+            [page(first), page(second)],
+            [detail_for_new_attempt],
+        )
+
+        service.poll_once()
+        service.poll_once()
+
+        old_notification = SolutionNotification.get(
+            SolutionNotification.submission_id == 127
+        )
+        old_tracking = AIReviewTracking.get(
+            AIReviewTracking.notification == old_notification
+        )
+        self.assertEqual(client.detail_calls, [])
+        self.assertEqual(old_tracking.status, 'stale')
+        self.assertEqual(old_notification.status, 'superseded')
+        self.assertIn('Отправлена новая попытка', self.bot.edited_texts[-1][0])
+        self.assertIsNone(self.bot.edited_texts[-1][1]['reply_markup'])
+        self.assertEqual(SolutionNotification.select().count(), 2)
+        self.assertNotIn('Это новая попытка.', self.bot.messages[0][1])
+
+    def test_old_button_cannot_review_a_newer_attempt_not_yet_polled(self):
+        first = solution(submission_id=127)
+        newer = solution(submission_id=128, attempt=2)
+        service, client = self.make_service([page(first)], [newer])
+        service.poll_once()
+        notification = SolutionNotification.get()
+
+        with self.assertRaises(StaleSubmissionError):
+            service.accept(1001, notification.id)
+
+        self.assertFalse(client.review_calls)
+        self.assertEqual(SolutionNotification.get().status, 'superseded')
+        self.assertIn('новая попытка', self.bot.edited_texts[-1][0])
+
+    def test_repeated_old_page_cannot_reactivate_superseded_buttons(self):
+        first = solution(submission_id=127)
+        newer = solution(submission_id=128, attempt=2)
+        service, _ = self.make_service([page(first), page(newer)])
+        service.poll_once()
+        service.poll_once()
+        old_notification = SolutionNotification.get(
+            SolutionNotification.submission_id == 127
+        )
+        newer_notification = SolutionNotification.get(
+            SolutionNotification.submission_id == 128
+        )
+        markup_count = len(self.bot.edited_markups)
+
+        service._deliver_submission(self.teacher, first)
+
+        self.assertEqual(len(self.bot.edited_markups), markup_count)
+        self.assertEqual(
+            SolutionNotification.get_by_id(old_notification.id).status,
+            'superseded',
+        )
+        self.assertEqual(
+            SolutionNotification.get_by_id(newer_notification.id).status,
+            'pending',
+        )
+
+    def test_new_attempt_during_comment_entry_prevents_review(self):
+        first = solution(submission_id=127)
+        newer = solution(submission_id=128, attempt=2)
+        service, client = self.make_service(
+            [page(first)],
+            [first, newer],
+        )
+        service.poll_once()
+        notification = SolutionNotification.get()
+        service.request_revision_comment(1001, notification.id)
+
+        with self.assertRaises(StaleSubmissionError):
+            service.submit_revision_comment(1001, 'Исправьте код')
+
+        self.assertFalse(client.review_calls)
+        self.assertFalse(PendingSolutionReview.select().exists())
+        self.assertEqual(SolutionNotification.get().status, 'superseded')
+
+    def test_legacy_queue_without_ai_review_remains_supported(self):
+        service, client = self.make_service([page(solution()), page(cursor=127)])
+
+        service.poll_once()
+        service.poll_once()
+
+        self.assertNotIn('🤖', self.bot.messages[0][1])
+        self.assertFalse(AIReviewTracking.select().exists())
+        self.assertEqual(client.detail_calls, [])
+
+    def test_missing_detail_endpoint_does_not_break_pending_delivery(self):
+        pending = solution(ai_review=review('pending', feedback=None))
+        service, client = self.make_service(
+            [page(pending), page(cursor=127)],
+            [CourseMCAPIError(404, 'not found')],
+        )
+
+        service.poll_once()
+        service.poll_once()
+
+        self.assertEqual(BotState.get().value, '127')
+        self.assertEqual(client.detail_calls, [42])
+        self.assertEqual(AIReviewTracking.get().status, 'detail_unavailable')
+        self.assertIn('Требуется ручная проверка', self.bot.edited_texts[-1][0])
 
     def test_downloads_one_and_multiple_files(self):
         for count in (1, 3):
@@ -336,6 +709,22 @@ class FakeHTTPSession:
 
 
 class CourseMCClientTests(unittest.TestCase):
+    def test_get_solution_uses_protected_detail_endpoint(self):
+        response = FakeHTTPResponse(200, {'id': 42, 'submission_id': 127})
+        session = FakeHTTPSession(response)
+        client = CourseMCClient(
+            'https://coursemc.ru/api/v1',
+            'very-secret-token',
+            session=session,
+        )
+
+        self.assertEqual(client.get_solution(42)['id'], 42)
+        self.assertEqual(
+            session.last_url,
+            'https://coursemc.ru/api/v1/bot/lesson-solutions/42/',
+        )
+        self.assertNotIn('very-secret-token', session.last_url)
+
     def test_invalid_token_response_is_not_retried_or_exposed_in_url(self):
         response = FakeHTTPResponse(403, {'detail': 'forbidden'})
         session = FakeHTTPSession(response)
